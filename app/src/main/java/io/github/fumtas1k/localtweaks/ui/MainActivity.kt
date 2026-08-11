@@ -237,7 +237,11 @@ private fun TrailingAction(content: @Composable () -> Unit) {
     }
 }
 
-/** A button label that reserves space for a progress indicator so the button never resizes. */
+/**
+ * A button label that reserves space for a progress indicator so the button never resizes.
+ * The same size is reserved on both sides of the text so the label stays centered whether or
+ * not the indicator is showing.
+ */
 @Composable
 private fun ButtonLabel(text: String, showProgress: Boolean) {
     Row(
@@ -254,6 +258,7 @@ private fun ButtonLabel(text: String, showProgress: Boolean) {
             Spacer(modifier = Modifier.size(16.dp))
         }
         Text(text)
+        Spacer(modifier = Modifier.size(16.dp))
     }
 }
 
@@ -365,16 +370,10 @@ private fun CameraFeatureCard(connected: Boolean, onOpenCameraSettings: () -> Un
         enabled = connected,
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (connected) {
-                MaterialTheme.colorScheme.surfaceContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceContainerLowest
-            },
-            contentColor = if (connected) {
-                MaterialTheme.colorScheme.onSurface
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
     ) {
         Row(
@@ -505,7 +504,10 @@ private fun ConnectionSettingsScreen(
             TextButton(
                 onClick = onResetCredentials,
                 enabled = actionsEnabled,
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error,
+                    disabledContentColor = MaterialTheme.colorScheme.error.copy(alpha = 0.38f),
+                ),
             ) {
                 ButtonLabel(
                     text = stringResource(R.string.reset_credentials),
