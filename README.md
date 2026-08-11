@@ -1,5 +1,7 @@
 # Galaxy S26 Ultra Local ADB Utility
 
+[![CI](https://github.com/fumtas1k/local-tweaks/actions/workflows/ci.yml/badge.svg)](https://github.com/fumtas1k/local-tweaks/actions/workflows/ci.yml)
+
 Galaxy S26 Ultra自身からLocal ADBへ接続し、Samsung固有のカメラシャッター音強制設定を確認・変更するための、自己管理・自己署名を前提としたAndroidアプリです。
 
 Phase 5のhardeningまで完了しています。通常の`Settings.System` APIによる変更はSamsung側に拒否されましたが、Local ADBのpairingと接続に成功し、固定したGETと0/1へのPUTを実行できます。PUT後は同じ接続上で必ずGETし、一致した場合だけ成功として表示します。
