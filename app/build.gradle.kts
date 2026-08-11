@@ -1,5 +1,17 @@
+import java.util.zip.ZipFile
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.provider.SetProperty
+import org.gradle.api.tasks.Classpath
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.TaskAction
+
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
@@ -17,6 +29,10 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+    }
+
+    buildFeatures {
+        compose = true
     }
 
     buildTypes {
@@ -48,16 +64,19 @@ android {
 }
 
 dependencies {
-    // Local ADB is a debug-only probe dependency; the release app must not
-    // package its transport, crypto providers, or transitive SPAKE2 library.
-    debugImplementation("com.github.MuntashirAkon:libadb-android:3.1.1")
-    // Bouncy Castle supplies the X.509 builder used by the probe certificate.
-    debugImplementation("org.bouncycastle:bcpkix-jdk15to18:1.81")
-    // Conscrypt is required by libadb for the Android TLS pairing handshake.
-    debugImplementation("org.conscrypt:conscrypt-android:2.5.3")
+    testImplementation("junit:junit:4.13.2")
+    implementation(platform("androidx.compose:compose-bom:2026.06.00"))
+    implementation("androidx.activity:activity-compose:1.11.0")
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material3:material3")
+
+    implementation("com.github.MuntashirAkon:libadb-android:3.1.1")
+    implementation("org.bouncycastle:bcpkix-jdk15to18:1.81")
+    implementation("org.conscrypt:conscrypt-android:2.5.3")
 }
 
-private val forbiddenReleaseArtifacts = setOf(
+private val requiredReleaseArtifacts = setOf(
     "libadb-android",
     "spake2-android",
     "bcprov-jdk15to18",
@@ -66,40 +85,43 @@ private val forbiddenReleaseArtifacts = setOf(
     "conscrypt-android",
 )
 
-// Keep the source-set boundary executable: an accidental implementation or
-// dependency move must fail CI before a release artifact is produced.
-tasks.register("verifyReleaseRuntimeClasspath") {
-    doLast {
-        val releaseRuntimeClasspath = configurations.getByName("releaseRuntimeClasspath")
-        val violations = releaseRuntimeClasspath.resolve().filter { file ->
-            forbiddenReleaseArtifacts.any { artifact ->
-                file.nameWithoutExtension == artifact ||
-                    file.nameWithoutExtension.startsWith("$artifact-")
+abstract class VerifyReleaseRuntimeClasspathTask : DefaultTask() {
+    @get:Classpath
+    abstract val runtimeClasspath: ConfigurableFileCollection
+
+    @get:Input
+    abstract val requiredArtifacts: SetProperty<String>
+
+    @TaskAction
+    fun verify() {
+        val resolved = runtimeClasspath.files
+        val missing = requiredArtifacts.get().filter { artifact ->
+            resolved.none { file ->
+                file.nameWithoutExtension == artifact || file.nameWithoutExtension.startsWith("$artifact-")
             }
         }
-        check(violations.isEmpty()) {
-            "Release runtime classpath contains debug-only ADB artifacts: " +
-                violations.joinToString { it.name }
-        }
+        check(missing.isEmpty()) { "Release runtime classpath is missing production ADB artifacts: $missing" }
     }
 }
 
-tasks.register("verifyReleaseManifest") {
-    dependsOn("processReleaseMainManifest")
-    doLast {
-        val manifests = mutableListOf(file("src/main/AndroidManifest.xml"))
-        val mergedManifestDirectory = layout.buildDirectory.dir("intermediates/merged_manifest/release").get().asFile
-        if (mergedManifestDirectory.isDirectory) {
-            manifests += fileTree(mergedManifestDirectory) {
-                include("**/AndroidManifest.xml")
-            }.files
+abstract class VerifyReleaseManifestTask : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val manifests: ConfigurableFileCollection
+
+    @TaskAction
+    fun verify() {
+        val manifestFiles = manifests.files.filter { it.isFile && it.name == "AndroidManifest.xml" }
+        check(manifestFiles.isNotEmpty()) {
+            "Release merged manifest was not produced"
         }
         val forbiddenMarkers = listOf(
             "android.permission.WRITE_SETTINGS",
             "LocalAdbProbeActivity",
+            "SettingsProbeActivity",
             ".probe",
         )
-        val violations = manifests.flatMap { manifest ->
+        val violations = manifestFiles.flatMap { manifest ->
             val content = manifest.readText()
             forbiddenMarkers.filter(content::contains).map { marker ->
                 "${manifest.path}: $marker"
@@ -108,24 +130,60 @@ tasks.register("verifyReleaseManifest") {
         check(violations.isEmpty()) {
             "Release manifest contains debug-only entries: ${violations.joinToString()}"
         }
+        val permissionPattern = Regex("""<uses-permission\b[^>]*android:name="([^"]+)""" )
+        val permissions = manifestFiles.flatMap { manifest ->
+            permissionPattern.findAll(manifest.readText()).map { it.groupValues[1] }.toList()
+        }.toSet()
+        check(permissions == setOf("android.permission.INTERNET")) {
+            "Release manifest permissions are not least privilege: $permissions"
+        }
+        check(manifestFiles.none { it.readText().contains("DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION") }) {
+            "Release manifest contains an unexpected dynamic receiver permission"
+        }
     }
 }
 
-tasks.register("verifyReleaseArtifact") {
-    dependsOn("assembleRelease")
-    doLast {
-        val releaseApks = fileTree(layout.buildDirectory.dir("outputs/apk/release").get().asFile) {
-            include("*.apk")
-        }.files
-        check(releaseApks.isNotEmpty()) { "No release APK was produced for artifact inspection" }
-        val forbiddenEntries = releaseApks.flatMap { apk ->
-            zipTree(apk).files.filter { entry ->
-                val path = entry.name
-                path.contains("probe", ignoreCase = true) ||
-                    path.contains("libadb", ignoreCase = true) ||
-                    path.contains("conscrypt", ignoreCase = true) ||
-                    path.contains("bouncycastle", ignoreCase = true)
-            }.map { entry -> "${apk.name}: ${entry.name}" }
+abstract class VerifyReleaseArtifactTask : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val releaseApks: ConfigurableFileCollection
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val productionSources: ConfigurableFileCollection
+
+    @TaskAction
+    fun verify() {
+        val apks = releaseApks.files.filter { it.isFile && it.extension == "apk" }
+        check(apks.isNotEmpty()) { "No release APK was produced for artifact inspection" }
+        val forbiddenSourceMarkers = listOf(
+            "echo hello",
+            "shell:echo",
+            "SettingsProbeActivity",
+            "LocalAdbProbeActivity",
+            "android.permission.WRITE_SETTINGS",
+        )
+        val sourceViolations = productionSources.files
+            .filter { it.isFile }
+            .flatMap { source ->
+                val content = source.readText()
+                forbiddenSourceMarkers.filter(content::contains).map { marker -> "${source.path}: $marker" }
+            }
+        check(sourceViolations.isEmpty()) {
+            "Production source contains removed probe markers: ${sourceViolations.joinToString()}"
+        }
+        val forbiddenEntries = apks.flatMap { apk ->
+            ZipFile(apk).use { zip ->
+                val removedProbeMarkers = listOf(
+                    "LocalAdbProbeActivity",
+                    "SettingsProbeActivity",
+                    "localtweaks/probe",
+                )
+                zip.entries().asSequence()
+                    .filter { entry -> removedProbeMarkers.any { marker -> entry.name.contains(marker) } }
+                    .map { entry -> "${apk.name}: ${entry.name}" }
+                    .toList()
+            }
         }
         check(forbiddenEntries.isEmpty()) {
             "Release APK contains debug-only probe entries: ${forbiddenEntries.joinToString()}"
@@ -133,8 +191,32 @@ tasks.register("verifyReleaseArtifact") {
     }
 }
 
+val verifyReleaseRuntimeClasspath = tasks.register<VerifyReleaseRuntimeClasspathTask>("verifyReleaseRuntimeClasspath") {
+    runtimeClasspath.from(configurations.named("releaseRuntimeClasspath"))
+    requiredArtifacts.set(requiredReleaseArtifacts)
+}
+
+val verifyReleaseManifest = tasks.register<VerifyReleaseManifestTask>("verifyReleaseManifest") {
+    dependsOn("processReleaseMainManifest")
+    manifests.from(
+        layout.buildDirectory.dir("intermediates/merged_manifest/release").map { directory ->
+            directory.asFileTree.matching { include("**/AndroidManifest.xml") }
+        },
+    )
+}
+
+val verifyReleaseArtifact = tasks.register<VerifyReleaseArtifactTask>("verifyReleaseArtifact") {
+    dependsOn("assembleRelease")
+    releaseApks.from(
+        layout.buildDirectory.dir("outputs/apk/release").map { directory ->
+            directory.asFileTree.matching { include("**/*.apk") }
+        },
+    )
+    productionSources.from(layout.projectDirectory.dir("src/main").asFileTree)
+}
+
 tasks.named("check") {
-    dependsOn("verifyReleaseRuntimeClasspath")
-    dependsOn("verifyReleaseManifest")
-    dependsOn("verifyReleaseArtifact")
+    dependsOn(verifyReleaseRuntimeClasspath)
+    dependsOn(verifyReleaseManifest)
+    dependsOn(verifyReleaseArtifact)
 }

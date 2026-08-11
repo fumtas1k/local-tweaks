@@ -2,14 +2,19 @@
 
 Galaxy S26 Ultra自身からLocal ADBへ接続し、Samsung固有のカメラシャッター音強制設定を確認・変更するための、自己管理・自己署名を前提としたAndroidアプリです。
 
-Phase 2のLocal ADB PoCまで完了しています。通常の`Settings.System` APIによる変更はSamsung側に拒否されましたが、USBを外した実機でLocal ADBのpairing、接続、固定`echo hello`に成功しました。設定を扱うMVPはまだありません。
+Phase 3のread-only MVPまで完了しています。通常の`Settings.System` APIによる変更はSamsung側に拒否されましたが、Local ADBのpairingと接続に成功し、固定した`settings get`の結果をCompose UIへ表示できます。0/1への変更機能はまだありません。
 
 ## 対象操作
 
-release版で許可する操作は次の3つだけです。
+現在のread-only版で実装済みの操作は次だけです。
 
 ```shell
 settings get system csc_pref_camera_forced_shuttersound_key
+```
+
+Phase 4で追加予定の操作も次の2つに限定します。
+
+```shell
 settings put system csc_pref_camera_forced_shuttersound_key 0
 settings put system csc_pref_camera_forced_shuttersound_key 1
 ```
@@ -42,9 +47,9 @@ settings put system csc_pref_camera_forced_shuttersound_key 1
 1. ✅ Galaxy S26 Ultra実機で対象settingのGET・PUT・read-backを確認する。
 2. ✅ debug variantで通常の`Settings.System` APIを検証し、変更不可を確認する。
 3. ✅ Local ADBのpairing、接続、debug限定の固定`echo hello`をPoCする。
-4. ⏳ read-only MVPを実装する。
-5. 0/1への変更とread-back verificationを追加する。
-6. dependency verification、manifest検査、backup除外を行う。
+4. ✅ read-only MVPを実装し、実機でraw値を表示する。
+5. ⏳ 0/1への変更とread-back verificationを追加する。
+6. dependency verification、manifest検査、backup除外を継続して強化する。
 
 次のコマンドを使用します。
 
@@ -55,15 +60,15 @@ settings put system csc_pref_camera_forced_shuttersound_key 1
 ./gradlew connectedAndroidTest
 ```
 
-### Phase 1 probe（検証完了）
+### Phase 3 read-only MVP
 
-probeはdebug buildだけに存在し、広いspecial accessである`WRITE_SETTINGS`を一時的に要求します。release buildにはこの権限と画面を含めません。
+画面でWireless Debuggingの接続用ポートを入力し、`Connect`後に`Read current setting`を押すと、対象settingのraw値を表示します。未設定は`Not set`、0/1以外は解釈せずそのまま表示します。
 
 ```shell
 ./gradlew installDebug
 ```
 
-SC-53Gではspecial access付与後も`Settings.System.putInt`が`IllegalArgumentException`で拒否されました。再確認する場合、端末で「Local Tweaks Probe」を開き、「設定変更の許可を開く」からspecial accessを付与します。検証後はspecial accessを解除してください。
+Phase 1/2の一時的なprobe、`WRITE_SETTINGS`、固定`echo hello`は削除済みです。release manifestで許可するpermissionは`INTERNET`だけです。
 
 ## 開発に参加する場合
 

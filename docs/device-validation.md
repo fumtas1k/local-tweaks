@@ -115,3 +115,25 @@ USBケーブルを外し、Wi-FiとWireless DebuggingをONにした状態で次�
 ## Phase 2判定
 
 SC-53Gの現行buildでは`libadb-android`方式を条件付き採用とする。Android Keystore RSA鍵の直接利用は避け、AES-GCMで保護したsoftware RSA鍵を使う。Phase 3では汎用stream APIをinfrastructure内部へ閉じ込め、固定のsetting GETだけを実装する。
+
+## Phase 3: read-only MVP
+
+Phase 2のdebug APKへPhase 3版を上書きし、保存済み資格情報を保持したままSC-53Gで検証した。Compose UIから入力できる接続情報はポート番号と6桁のペアリングコードだけで、ADB hostは`127.0.0.1`、shell serviceは次の固定値である。
+
+```text
+shell:settings get system csc_pref_camera_forced_shuttersound_key
+```
+
+| 操作 | 結果 |
+|---|---|
+| 保存済み資格情報で接続 | 成功、再pairing不要 |
+| 固定GET | `0` |
+| Compose UIの現在値表示 | `Current value: 0` |
+| 画面回転 | 接続用ポート、状態、現在値を保持 |
+| USBケーブルを外した後の再GET | `0`、Local ADB単独で成功 |
+
+Phase 1の`WRITE_SETTINGS`、Phase 2の固定`echo hello`、debug probe Activityは削除した。Unit Test、lint、debug/release build、dependency checksum検証に加え、release merged manifestのpermissionが`INTERNET`だけであることを自動検査した。
+
+## Phase 3判定
+
+固定GETの値を型付きで読み取り、SC-53GのCompose UIへraw値を表示する成功条件を満たした。次はPhase 4で、固定した0/1へのPUTと同一接続上のGETによるread-back verificationを追加する。

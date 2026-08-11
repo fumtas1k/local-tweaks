@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <lint>
     <!-- ADB pairing authenticates with SPAKE2 after TLS key export. This
-         debug-only, loopback-only dependency intentionally accepts the
-         ephemeral adbd certificate. Reassess before any release use. -->
+         loopback-only dependency intentionally accepts the ephemeral adbd
+         certificate. Reassess when the transport library changes. -->
     <issue id="TrustAllX509TrustManager">
         <ignore regexp="libadb-android-3\.1\.1" />
-        <!-- Bouncy Castle is included only to generate the local ADB client
-             certificate. The probe never installs its TLS provider or uses
-             its trust-manager implementation. -->
+        <!-- Bouncy Castle only generates the local ADB client certificate;
+             the app never installs its TLS provider or trust manager. -->
         <ignore regexp="bcpkix-jdk15to18-1\.81" />
     </issue>
 </lint>

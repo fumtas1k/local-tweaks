@@ -1,4 +1,4 @@
-package io.github.fumtas1k.localtweaks.probe
+package io.github.fumtas1k.localtweaks.adb
 
 import android.content.Context
 import android.os.Build
@@ -31,15 +31,8 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-/**
- * Phase 2 probe's process-scoped ADB session.
- *
- * Credential I/O is deliberately lazy: libadb calls the key accessors from
- * pair/connect, and those operations are dispatched by the process session's
- * worker.
- * This keeps RSA generation and AndroidKeyStore access off the main thread.
- */
-internal class ProbeAdbManager(private val context: Context) : AbsAdbConnectionManager() {
+/** The only production ADB transport. Its endpoint is always numeric loopback. */
+internal class LocalAdbManager(private val context: Context) : AbsAdbConnectionManager() {
     private val sessionLock = Any()
     private val credentialLock = Any()
     private var credentials: Credentials? = null
@@ -55,12 +48,9 @@ internal class ProbeAdbManager(private val context: Context) : AbsAdbConnectionM
     }
 
     override fun getPrivateKey(): PrivateKey = loadCredentials().keyPair.private
-
     override fun getCertificate(): Certificate = loadCredentials().certificate
+    override fun getDeviceName(): String = "Local Tweaks"
 
-    override fun getDeviceName(): String = "Local Tweaks Probe"
-
-    // Keep all libadb session operations serialized, including teardown.
     override fun pair(port: Int, pairingCode: String): Boolean = synchronized(sessionLock) {
         checkNotRestarted()
         super.pair(port, pairingCode)
@@ -71,27 +61,23 @@ internal class ProbeAdbManager(private val context: Context) : AbsAdbConnectionM
         super.connect(port)
     }
 
-    override fun openStream(command: String): AdbStream = synchronized(sessionLock) {
+    /** Opens only the fixed settings read command; no caller-supplied command is accepted. */
+    fun openForcedShutterReadStream(): AdbStream = synchronized(sessionLock) {
         checkNotRestarted()
-        super.openStream(command)
+        super.openStream(FORCED_SHUTTER_READ_COMMAND)
     }
 
-    override fun disconnect() = synchronized(sessionLock) {
-        super.disconnect()
-    }
+    override fun disconnect() = synchronized(sessionLock) { super.disconnect() }
 
-    /** True once if loading recovered from corrupt/invalidated credentials. */
-    fun consumeCredentialResetNotice(): Boolean {
-        synchronized(credentialLock) {
-            val reset = credentialResetPending
-            credentialResetPending = false
-            return reset
-        }
+    fun consumeCredentialResetNotice(): Boolean = synchronized(credentialLock) {
+        val reset = credentialResetPending
+        credentialResetPending = false
+        reset
     }
 
     private fun checkNotRestarted() {
         check(!processRestartRequired) {
-            "資格情報を削除しました。アプリを再起動してから再pairingしてください"
+            "ADB credentials were reset; restart the app before pairing again"
         }
     }
 
@@ -101,42 +87,29 @@ internal class ProbeAdbManager(private val context: Context) : AbsAdbConnectionM
             credentials?.let { return it }
             val hadStoredCredentials = hasStoredCredentialFiles()
             return try {
-                loadExistingCredentials()?.also {
-                    credentials = it
-                } ?: createAndStoreAdbCredentials().also {
-                    credentials = it
-                }
+                loadExistingCredentials()?.also { credentials = it }
+                    ?: createAndStoreAdbCredentials().also { credentials = it }
             } catch (exception: Exception) {
                 if (!hadStoredCredentials) throw exception
-                // Includes AEADBadTagException, malformed PKCS#8/certificate,
-                // and AndroidKeyStore invalidation/unrecoverable-key errors.
                 val cleanupFailure = runCatching { deleteStoredCredentials() }.exceptionOrNull()
                 if (cleanupFailure != null) {
                     exception.addSuppressed(cleanupFailure)
                     throw exception
                 }
                 credentialResetPending = true
-                // libadb can retain static TLS state. Never create a new
-                // identity in this process after an existing credential
-                // failed; force a clean process before the next pairing.
                 processRestartRequired = true
-                throw CredentialsRequireRestartException().also {
-                    it.addSuppressed(exception)
-                }
+                throw CredentialsRequireRestartException().also { it.addSuppressed(exception) }
             }
         }
     }
 
     private fun hasStoredCredentialFiles(): Boolean =
         context.getFileStreamPath(ENCRYPTED_KEY_FILE).exists() ||
-            context.getFileStreamPath(CERTIFICATE_FILE).exists() ||
-            wrappingKeyAliasExists()
+            context.getFileStreamPath(CERTIFICATE_FILE).exists() || wrappingKeyAliasExists()
 
     private fun wrappingKeyAliasExists(): Boolean = try {
         getKeyStore().containsAlias(WRAPPING_KEY_ALIAS)
     } catch (_: Exception) {
-        // A broken/invalidated Keystore is stored material that must enter
-        // the cleanup-and-restart recovery path, not fresh-device creation.
         true
     }
 
@@ -149,14 +122,10 @@ internal class ProbeAdbManager(private val context: Context) : AbsAdbConnectionM
         }
         if (encryptedFile.length() !in 1..MAX_FILE_SIZE ||
             certificateFile.length() !in 1..MAX_CERTIFICATE_SIZE
-        ) {
-            throw IOException("ADB credential file is too large")
-        }
+        ) throw IOException("ADB credential file is too large")
 
         ensureWrappingKey()
-        val privateKeyBytes = DataInputStream(
-            context.openFileInput(ENCRYPTED_KEY_FILE),
-        ).use { input ->
+        val privateKeyBytes = DataInputStream(context.openFileInput(ENCRYPTED_KEY_FILE)).use { input ->
             val iv = ByteArray(input.readInt().also { require(it in 12..32) })
             input.readFully(iv)
             val encrypted = ByteArray(input.readInt().also { require(it in 1..MAX_KEY_BLOB_SIZE) })
@@ -222,15 +191,13 @@ internal class ProbeAdbManager(private val context: Context) : AbsAdbConnectionM
     }
 
     private fun createCertificate(keyPair: KeyPair): Certificate {
-        val subject = X500Name("CN=Local Tweaks Probe")
-        val notBefore = Date(System.currentTimeMillis() - ONE_MINUTE_MILLIS)
-        val notAfter = Date(System.currentTimeMillis() + TEN_YEARS_MILLIS)
+        val subject = X500Name("CN=Local Tweaks")
         val serial = BigInteger(128, SecureRandom()).let { if (it.signum() == 0) BigInteger.ONE else it }
         val builder = JcaX509v3CertificateBuilder(
             subject,
             serial,
-            notBefore,
-            notAfter,
+            Date(System.currentTimeMillis() - ONE_MINUTE_MILLIS),
+            Date(System.currentTimeMillis() + TEN_YEARS_MILLIS),
             subject,
             keyPair.public,
         )
@@ -240,10 +207,9 @@ internal class ProbeAdbManager(private val context: Context) : AbsAdbConnectionM
         }
     }
 
-    private fun loadCertificate(): Certificate =
-        context.openFileInput(CERTIFICATE_FILE).use {
-            CertificateFactory.getInstance("X.509").generateCertificate(it)
-        }
+    private fun loadCertificate(): Certificate = context.openFileInput(CERTIFICATE_FILE).use {
+        CertificateFactory.getInstance("X.509").generateCertificate(it)
+    }
 
     private fun decryptPrivateKey(iv: ByteArray, encrypted: ByteArray): ByteArray =
         Cipher.getInstance(AES_TRANSFORMATION).run {
@@ -257,8 +223,7 @@ internal class ProbeAdbManager(private val context: Context) : AbsAdbConnectionM
         val spec = KeyGenParameterSpec.Builder(
             WRAPPING_KEY_ALIAS,
             KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
-        )
-            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+        ).setBlockModes(KeyProperties.BLOCK_MODE_GCM)
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
             .setKeySize(256)
             .setRandomizedEncryptionRequired(true)
@@ -278,18 +243,14 @@ internal class ProbeAdbManager(private val context: Context) : AbsAdbConnectionM
     }
 
     private fun deleteStoredCredentials() {
-        val encryptedFile = context.getFileStreamPath(ENCRYPTED_KEY_FILE)
-        val certificateFile = context.getFileStreamPath(CERTIFICATE_FILE)
-        if (encryptedFile.exists() && !context.deleteFile(ENCRYPTED_KEY_FILE)) {
-            throw IOException("could not delete encrypted ADB key")
-        }
-        if (certificateFile.exists() && !context.deleteFile(CERTIFICATE_FILE)) {
-            throw IOException("could not delete ADB certificate")
-        }
+        if (context.getFileStreamPath(ENCRYPTED_KEY_FILE).exists() &&
+            !context.deleteFile(ENCRYPTED_KEY_FILE)
+        ) throw IOException("could not delete encrypted ADB key")
+        if (context.getFileStreamPath(CERTIFICATE_FILE).exists() &&
+            !context.deleteFile(CERTIFICATE_FILE)
+        ) throw IOException("could not delete ADB certificate")
         val store = getKeyStore()
-        if (store.containsAlias(WRAPPING_KEY_ALIAS)) {
-            store.deleteEntry(WRAPPING_KEY_ALIAS)
-        }
+        if (store.containsAlias(WRAPPING_KEY_ALIAS)) store.deleteEntry(WRAPPING_KEY_ALIAS)
         keyStore = null
     }
 
@@ -299,8 +260,7 @@ internal class ProbeAdbManager(private val context: Context) : AbsAdbConnectionM
 
     private data class Credentials(val keyPair: KeyPair, val certificate: Certificate) {
         constructor(privateKey: PrivateKey, certificate: Certificate) : this(
-            KeyPair(certificate.publicKey, privateKey),
-            certificate,
+            KeyPair(certificate.publicKey, privateKey), certificate,
         )
     }
 
@@ -311,6 +271,8 @@ internal class ProbeAdbManager(private val context: Context) : AbsAdbConnectionM
         const val CERTIFICATE_FILE = "adb_certificate.der"
         const val AES_TRANSFORMATION = "AES/GCM/NoPadding"
         const val LOOPBACK_HOST = "127.0.0.1"
+        const val FORCED_SHUTTER_READ_COMMAND =
+            "shell:settings get system csc_pref_camera_forced_shuttersound_key"
         const val MAX_KEY_BLOB_SIZE = 16 * 1024
         const val MAX_FILE_SIZE = MAX_KEY_BLOB_SIZE + 128
         const val MAX_CERTIFICATE_SIZE = 32 * 1024L

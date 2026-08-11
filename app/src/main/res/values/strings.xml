@@ -1,4 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Local Tweaks</string>
+    <string name="local_adb">Local ADB</string>
+    <string name="status">Status: %1$s</string>
+    <string name="status_not_connected">Not connected</string>
+    <string name="value_not_read">Not read</string>
+    <string name="current_value">Current value: %1$s</string>
+    <string name="open_wireless_debugging">Open developer settings</string>
+    <string name="pairing_port">Pairing port</string>
+    <string name="pairing_code">6-digit pairing code</string>
+    <string name="invalid_pairing_port">Invalid pairing port</string>
+    <string name="invalid_pairing_code">Pairing code must be 6 ASCII digits</string>
+    <string name="pairing_progress">Pairing…</string>
+    <string name="pairing_success">Paired</string>
+    <string name="pairing_failed">Pairing failed</string>
+    <string name="pair">Pair</string>
+    <string name="connection_port">Connection port</string>
+    <string name="invalid_connection_port">Invalid connection port</string>
+    <string name="connecting_progress">Connecting…</string>
+    <string name="connection_success">Connected</string>
+    <string name="connection_failed">Connection failed</string>
+    <string name="connect">Connect</string>
+    <string name="reading_progress">Reading…</string>
+    <string name="read_complete">Read complete</string>
+    <string name="invalid_output">Invalid setting output</string>
+    <string name="read_transport_failed">Unable to read from Local ADB</string>
+    <string name="read_current_setting">Read current setting</string>
+    <string name="value_not_set">Not set</string>
 </resources>
