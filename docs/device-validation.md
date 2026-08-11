@@ -159,3 +159,25 @@ Phase 3版へ固定PUT 0/1とread-back verificationを追加し、同じ保存�
 ## Phase 4判定
 
 固定した3コマンドだけで読み取り、0/1への変更、read-back verificationが成立した。資格情報リセットと再pairing導線も実機で確認した。最終値は`0`へ戻した。次はPhase 5のhardeningと実機test matrixへ進む。
+
+## Phase 5: hardening
+
+Phase 4の実機操作で、資格情報削除後も再起動前にPairを押せるため、想定どおり失敗するものの案内が不十分だった。Phase 5では再起動必須を型付き状態として保持し、Pair、Connect、GET、PUT 0/1、再リセットを無効化した。
+
+| 検証項目 | 結果 |
+|---|---|
+| 既存資格情報を保持したAPK上書き | 成功 |
+| 資格情報削除後の案内 | process再起動必須を表示 |
+| 再起動前のADB操作 | 全操作を無効化 |
+| process再起動後の新規pairing | 成功 |
+| 再pairing後の接続と固定GET | 成功、`0` |
+| Mac公式ADBによる最終値確認 | `0` |
+| strict dependency lock付きoffline build | Unit Test、lint、release検査すべて成功 |
+| release merged manifest | permissionは`INTERNET`だけ、backup無効 |
+| release source/artifact | 固定3コマンドだけ、旧probeとproduction loggingなし |
+
+対象test matrixはSC-53G、Android 16、One UI 8.5、CSC DCM、Build ID `BP4A.251205.006.SC53GOMS1AZF2`で完了した。USBを外したLocal ADB、画面回転、0/1 read-back、資格情報削除と再pairingを含む。他のCSC、build、One UI 9は未検証であり、結果を一般化しない。
+
+## Phase 5判定
+
+現行の対象端末とbuildについてMVPのDefinition of Doneを満たした。dependencyまたはpermissionを変更する場合は、strict lock、SHA-256 verification、merged manifest、release artifactの検査を再実行する。

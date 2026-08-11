@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import io.github.fumtas1k.localtweaks.R
+import io.github.fumtas1k.localtweaks.adb.AdbInputValidator
 import io.github.fumtas1k.localtweaks.adb.LocalAdbSession
 import io.github.fumtas1k.localtweaks.feature.shutter.ForcedSettingValue
 
@@ -63,6 +64,7 @@ private fun LocalTweaksScreen(viewModel: MainViewModel, onOpenSettings: () -> Un
         ForcedSettingValue.NotSet -> stringResource(R.string.value_not_set)
         is ForcedSettingValue.Present -> value.raw
     }
+    val actionsEnabled = !state.busy && !state.restartRequired
 
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
@@ -86,20 +88,24 @@ private fun LocalTweaksScreen(viewModel: MainViewModel, onOpenSettings: () -> Un
 
                 OutlinedTextField(
                     value = state.pairingPort,
-                    onValueChange = viewModel::setPairingPort,
+                    onValueChange = { viewModel.setPairingPort(it) },
                     label = { Text(stringResource(R.string.pairing_port)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    enabled = !state.busy,
+                    enabled = actionsEnabled,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = pairingCode,
-                    onValueChange = { pairingCode = it },
+                    onValueChange = {
+                        AdbInputValidator.acceptBoundedAsciiDigits(it, 6)?.let { accepted ->
+                            pairingCode = accepted
+                        }
+                    },
                     label = { Text(stringResource(R.string.pairing_code)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    enabled = !state.busy,
+                    enabled = actionsEnabled,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Button(
@@ -108,7 +114,7 @@ private fun LocalTweaksScreen(viewModel: MainViewModel, onOpenSettings: () -> Un
                         pairingCode = ""
                         viewModel.pair(code)
                     },
-                    enabled = !state.busy,
+                    enabled = actionsEnabled,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.pair)) }
 
@@ -118,36 +124,36 @@ private fun LocalTweaksScreen(viewModel: MainViewModel, onOpenSettings: () -> Un
                     label = { Text(stringResource(R.string.connection_port)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    enabled = !state.busy,
+                    enabled = actionsEnabled,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Button(
                     onClick = viewModel::connect,
-                    enabled = !state.busy,
+                    enabled = actionsEnabled,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.connect)) }
 
                 Spacer(Modifier.height(4.dp))
                 Button(
                     onClick = viewModel::read,
-                    enabled = !state.busy,
+                    enabled = actionsEnabled,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.read_current_setting)) }
 
                 Button(
                     onClick = viewModel::setZero,
-                    enabled = !state.busy,
+                    enabled = actionsEnabled,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.set_zero)) }
                 Button(
                     onClick = viewModel::setOne,
-                    enabled = !state.busy,
+                    enabled = actionsEnabled,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.set_one)) }
 
                 Button(
                     onClick = { showResetDialog = true },
-                    enabled = !state.busy,
+                    enabled = actionsEnabled,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.reset_credentials)) }
             }
@@ -202,6 +208,6 @@ private fun statusText(status: MainStatus): String = when (status) {
     MainStatus.WriteTimeout -> stringResource(R.string.write_timeout)
     MainStatus.WriteTransportFailed -> stringResource(R.string.write_transport_failed)
     MainStatus.CredentialResetting -> stringResource(R.string.reset_credentials_progress)
-    MainStatus.CredentialResetRestartRequired -> stringResource(R.string.reset_credentials_success)
+    MainStatus.RestartRequired -> stringResource(R.string.restart_required)
     MainStatus.CredentialResetFailed -> stringResource(R.string.reset_credentials_failed)
 }

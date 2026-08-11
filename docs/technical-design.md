@@ -477,6 +477,8 @@ SC-53G実機で完了した。0/1のPUT後に同一Local ADB sessionでGETし、
 - production logging無効化。
 - 実機test matrix完了。
 
+SC-53Gの現行buildを対象として完了した。全app configurationをstrict dependency lockとSHA-256 verificationで固定し、releaseのpermission、固定command表、backup設定、production logging、旧probe混入をGradle taskで検査する。資格情報削除または破損回復後は全ADB操作を無効化し、process再起動後だけ再pairingを許可する。
+
 ## 11. 未解決事項とGo/No-Go
 
 次はコードだけでは確定できず、追加の実機検証が必要。

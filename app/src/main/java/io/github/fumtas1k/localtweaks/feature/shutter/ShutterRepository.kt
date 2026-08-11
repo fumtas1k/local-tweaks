@@ -1,5 +1,6 @@
 package io.github.fumtas1k.localtweaks.feature.shutter
 
+import io.github.fumtas1k.localtweaks.adb.AdbRestartRequiredException
 import io.github.fumtas1k.localtweaks.adb.LocalAdbSession
 
 /** Domain-facing typed settings API; command details stay inside the ADB package. */
@@ -39,6 +40,7 @@ sealed interface ShutterReadResult {
 sealed interface ShutterReadError {
     data object InvalidOutput : ShutterReadError
     data object Timeout : ShutterReadError
+    data object RestartRequired : ShutterReadError
     data object TransportFailure : ShutterReadError
 }
 
@@ -50,6 +52,7 @@ sealed interface ShutterWriteResult {
     ) : ShutterWriteResult
     data object InvalidOutput : ShutterWriteResult
     data object Timeout : ShutterWriteResult
+    data object RestartRequired : ShutterWriteResult
     data object TransportFailure : ShutterWriteResult
 }
 
@@ -73,6 +76,8 @@ internal fun mapWriteResult(expected: String, result: Result<String>): ShutterWr
         },
         onFailure = { error ->
             when (error) {
+                is AdbRestartRequiredException ->
+                    ShutterWriteResult.RestartRequired
                 is LocalAdbSession.AdbTimeoutException -> ShutterWriteResult.Timeout
                 is LocalAdbSession.ProtocolException -> ShutterWriteResult.InvalidOutput
                 else -> ShutterWriteResult.TransportFailure
@@ -82,6 +87,8 @@ internal fun mapWriteResult(expected: String, result: Result<String>): ShutterWr
 
 internal fun mapReadFailure(error: Throwable): ShutterReadError =
     when (error) {
+        is AdbRestartRequiredException ->
+            ShutterReadError.RestartRequired
         is LocalAdbSession.AdbTimeoutException -> ShutterReadError.Timeout
         is LocalAdbSession.ProtocolException -> ShutterReadError.InvalidOutput
         else -> ShutterReadError.TransportFailure

@@ -2,7 +2,7 @@
 
 ## プロジェクト構成
 
-このリポジトリは固定settingを読み書きするPhase 4まで完了し、Phase 5のhardeningへ進む段階にある。プロダクト要件とセキュリティ要件は`docs/requirements.md`、実装方式の判断は`docs/technical-design.md`、実機結果は`docs/device-validation.md`を正とする。
+このリポジトリは固定settingを読み書きするMVPとPhase 5のhardeningまで完了している。プロダクト要件とセキュリティ要件は`docs/requirements.md`、実装方式の判断は`docs/technical-design.md`、実機結果は`docs/device-validation.md`を正とする。
 
 Androidモジュールは`app/`に置く。製品用Kotlinコードは`app/src/main/java/`以下で責務別に分け、Local ADB基盤を`adb/`、ドメインとRepositoryを`feature/shutter/`、Jetpack Compose画面と状態管理を`ui/`へ置く。リソースは`app/src/main/res/`、Unit Testは`app/src/test/`、Instrumented Testは`app/src/androidTest/`に配置する。完了したPhase 1/2 probeを再導入しない。
 
@@ -13,6 +13,8 @@ Androidモジュールは`app/`に置く。製品用Kotlinコードは`app/src/m
 - `./gradlew test` — JVM上のUnit Testを実行する。
 - `./gradlew connectedAndroidTest` — 接続端末でInstrumented Testを実行する。
 - `./gradlew lint` — Androidの静的解析を実行する。
+- `./gradlew --offline test lint check` — lock済み依存だけで全検証とrelease検査を実行する。
+- `./gradlew :app:dependencies --write-locks` — dependencyを意図的に変更した場合だけlockfileを更新する。
 
 文書だけの変更でも、コミット前に`git diff --check`と`git status --short`を確認する。
 
@@ -26,7 +28,7 @@ Kotlinは4スペースでインデントする。型とCompose関数は`UpperCam
 
 ## セキュリティと設定
 
-releaseコードで許可するのは、要件に定義されたGET、PUT 0、PUT 1の固定settings操作だけとする。PUT後は同じ接続上でGETし、期待値との一致を確認する。`WRITE_SETTINGS`、probe Activity、固定`echo hello`を再導入しない。任意shell入力、Shizuku、mDNS/LAN探索、Analytics、外部API通信を追加しない。ADB hostはnumeric loopback `127.0.0.1`に固定する。ペアリングコード、秘密鍵、署名素材、認証情報をログ出力またはコミットしない。
+releaseコードで許可するのは、要件に定義されたGET、PUT 0、PUT 1の固定settings操作だけとする。PUT後は同じ接続上でGETし、期待値との一致を確認する。`WRITE_SETTINGS`、probe Activity、固定`echo hello`を再導入しない。任意shell入力、Shizuku、mDNS/LAN探索、Analytics、外部API通信を追加しない。ADB hostはnumeric loopback `127.0.0.1`に固定する。ペアリングコード、秘密鍵、署名素材、認証情報をログ出力またはコミットしない。依存変更時は`app/gradle.lockfile`と`gradle/verification-metadata.xml`を同時に監査する。
 
 ## コミットとPull Request
 

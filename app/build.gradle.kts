@@ -1,5 +1,6 @@
 import java.util.zip.ZipFile
 import org.gradle.api.DefaultTask
+import org.gradle.api.artifacts.dsl.LockMode
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.provider.SetProperty
 import org.gradle.api.tasks.Classpath
@@ -76,6 +77,13 @@ dependencies {
     implementation("org.conscrypt:conscrypt-android:2.5.3")
 }
 
+// Lock all app configurations after the parent generates app/gradle.lockfile.
+// Generate/update it with: ./gradlew --write-locks test lint check
+dependencyLocking {
+    lockAllConfigurations()
+    lockMode.set(LockMode.STRICT)
+}
+
 private val requiredReleaseArtifacts = setOf(
     "libadb-android",
     "spake2-android",
@@ -109,6 +117,10 @@ abstract class VerifyReleaseManifestTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val manifests: ConfigurableFileCollection
 
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val dataExtractionRules: ConfigurableFileCollection
+
     @TaskAction
     fun verify() {
         val manifestFiles = manifests.files.filter { it.isFile && it.name == "AndroidManifest.xml" }
@@ -130,6 +142,13 @@ abstract class VerifyReleaseManifestTask : DefaultTask() {
         check(violations.isEmpty()) {
             "Release manifest contains debug-only entries: ${violations.joinToString()}"
         }
+        check(manifestFiles.all { manifest ->
+            val content = manifest.readText()
+            content.contains("android:allowBackup=\"false\"") &&
+                content.contains("android:dataExtractionRules=\"@xml/data_extraction_rules\"")
+        }) {
+            "Release manifest must disable backup and configure data extraction rules"
+        }
         val permissionPattern = Regex("""<uses-permission\b[^>]*android:name="([^"]+)""" )
         val permissions = manifestFiles.flatMap { manifest ->
             permissionPattern.findAll(manifest.readText()).map { it.groupValues[1] }.toList()
@@ -139,6 +158,34 @@ abstract class VerifyReleaseManifestTask : DefaultTask() {
         }
         check(manifestFiles.none { it.readText().contains("DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION") }) {
             "Release manifest contains an unexpected dynamic receiver permission"
+        }
+        val rulesFiles = dataExtractionRules.files.filter { it.isFile }
+        check(rulesFiles.size == 1) { "Expected one production data extraction rules file" }
+        val rules = rulesFiles.single().readText()
+        val requiredDomains = setOf(
+            "root",
+            "file",
+            "database",
+            "sharedpref",
+            "external",
+            "device_root",
+            "device_file",
+            "device_database",
+            "device_sharedpref",
+        )
+        fun section(name: String): String {
+            val start = rules.indexOf("<$name>")
+            val end = rules.indexOf("</$name>")
+            check(start >= 0 && end > start) { "Missing data extraction section: $name" }
+            return rules.substring(start, end)
+        }
+        for (sectionName in listOf("cloud-backup", "device-transfer")) {
+            val section = section(sectionName)
+            for (domain in requiredDomains) {
+                check(Regex("<exclude\\b[^>]*domain=\\\"$domain\\\"[^>]*path=\\\"\\.\\\"").containsMatchIn(section)) {
+                    "Data extraction rules do not exclude $domain from $sectionName"
+                }
+            }
         }
     }
 }
@@ -192,6 +239,26 @@ abstract class VerifyReleaseArtifactTask : DefaultTask() {
         check(shellCommands == fixedCommands) {
             "Production source command table is not exactly GET/PUT0/PUT1: $shellCommands"
         }
+        fun withoutComments(source: String): String = source
+            .replace(Regex("""/\*.*?\*/""", setOf(RegexOption.DOT_MATCHES_ALL)), "")
+            .lineSequence()
+            .filterNot { it.trimStart().startsWith("//") }
+            .joinToString("\n")
+        val loggingMarkers = listOf(
+            "android.util.Log",
+            "Log.",
+            "println(",
+            "printStackTrace(",
+        )
+        val loggingViolations = productionSources.files
+            .filter { it.isFile }
+            .flatMap { source ->
+                val content = withoutComments(source.readText())
+                loggingMarkers.filter(content::contains).map { marker -> "${source.path}: $marker" }
+            }
+        check(loggingViolations.isEmpty()) {
+            "Production source contains logging calls: ${loggingViolations.joinToString()}"
+        }
         val forbiddenEntries = apks.flatMap { apk ->
             ZipFile(apk).use { zip ->
                 val removedProbeMarkers = listOf(
@@ -223,6 +290,7 @@ val verifyReleaseManifest = tasks.register<VerifyReleaseManifestTask>("verifyRel
             directory.asFileTree.matching { include("**/AndroidManifest.xml") }
         },
     )
+    dataExtractionRules.from(layout.projectDirectory.file("src/main/res/xml/data_extraction_rules.xml"))
 }
 
 val verifyReleaseArtifact = tasks.register<VerifyReleaseArtifactTask>("verifyReleaseArtifact") {

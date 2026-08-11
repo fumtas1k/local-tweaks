@@ -101,9 +101,7 @@ internal class LocalAdbManager(private val context: Context) : AbsAdbConnectionM
     }
 
     private fun checkNotRestarted() {
-        check(!processRestartRequired) {
-            "ADB credentials were reset; restart the app before pairing again"
-        }
+        if (processRestartRequired) throw AdbRestartRequiredException()
     }
 
     private fun loadCredentials(): Credentials {
@@ -117,20 +115,22 @@ internal class LocalAdbManager(private val context: Context) : AbsAdbConnectionM
             } catch (exception: Exception) {
                 if (!hadStoredCredentials) throw exception
                 val cleanupFailure = runCatching { deleteStoredCredentials() }.exceptionOrNull()
-                if (cleanupFailure != null) {
-                    exception.addSuppressed(cleanupFailure)
-                    throw exception
-                }
                 credentialResetPending = true
                 processRestartRequired = true
-                throw CredentialsRequireRestartException().also { it.addSuppressed(exception) }
+                throw AdbRestartRequiredException().also {
+                    it.addSuppressed(exception)
+                    cleanupFailure?.let(it::addSuppressed)
+                }
             }
         }
     }
 
     private fun hasStoredCredentialFiles(): Boolean =
         context.getFileStreamPath(ENCRYPTED_KEY_FILE).exists() ||
-            context.getFileStreamPath(CERTIFICATE_FILE).exists() || wrappingKeyAliasExists()
+            context.getFileStreamPath(CERTIFICATE_FILE).exists() ||
+            context.getFileStreamPath(ENCRYPTED_KEY_TEMP_FILE).exists() ||
+            context.getFileStreamPath(CERTIFICATE_TEMP_FILE).exists() ||
+            wrappingKeyAliasExists()
 
     private fun wrappingKeyAliasExists(): Boolean = try {
         getKeyStore().containsAlias(WRAPPING_KEY_ALIAS)
@@ -268,20 +268,37 @@ internal class LocalAdbManager(private val context: Context) : AbsAdbConnectionM
     }
 
     private fun deleteStoredCredentials() {
-        if (context.getFileStreamPath(ENCRYPTED_KEY_FILE).exists() &&
-            !context.deleteFile(ENCRYPTED_KEY_FILE)
-        ) throw IOException("could not delete encrypted ADB key")
-        if (context.getFileStreamPath(CERTIFICATE_FILE).exists() &&
-            !context.deleteFile(CERTIFICATE_FILE)
-        ) throw IOException("could not delete ADB certificate")
-        val store = getKeyStore()
-        if (store.containsAlias(WRAPPING_KEY_ALIAS)) store.deleteEntry(WRAPPING_KEY_ALIAS)
-        keyStore = null
+        var failure: Exception? = null
+        fun attempt(action: () -> Unit) {
+            try {
+                action()
+            } catch (error: Exception) {
+                failure = failure?.also { it.addSuppressed(error) } ?: error
+            }
+        }
+        attempt { deleteCredentialFile(ENCRYPTED_KEY_FILE) }
+        attempt { deleteCredentialFile(CERTIFICATE_FILE) }
+        attempt { deleteCredentialFile(ENCRYPTED_KEY_TEMP_FILE) }
+        attempt { deleteCredentialFile(CERTIFICATE_TEMP_FILE) }
+        attempt {
+            try {
+                val store = getKeyStore()
+                if (store.containsAlias(WRAPPING_KEY_ALIAS)) store.deleteEntry(WRAPPING_KEY_ALIAS)
+            } finally {
+                keyStore = null
+            }
+        }
+        failure?.let { error ->
+            throw IOException("could not fully delete ADB credentials").also { it.addSuppressed(error) }
+        }
     }
 
-    private class CredentialsRequireRestartException : IOException(
-        "ADB credentials were reset; restart the app before pairing again",
-    )
+    private fun deleteCredentialFile(fileName: String) {
+        val file = context.getFileStreamPath(fileName)
+        if (file.exists() && !context.deleteFile(fileName)) {
+            throw IOException("could not delete ADB credential file")
+        }
+    }
 
     private data class Credentials(val keyPair: KeyPair, val certificate: Certificate) {
         constructor(privateKey: PrivateKey, certificate: Certificate) : this(
@@ -294,6 +311,8 @@ internal class LocalAdbManager(private val context: Context) : AbsAdbConnectionM
         const val WRAPPING_KEY_ALIAS = "local_tweaks_adb_key_wrapping"
         const val ENCRYPTED_KEY_FILE = "adb_private_key.enc"
         const val CERTIFICATE_FILE = "adb_certificate.der"
+        const val ENCRYPTED_KEY_TEMP_FILE = "$ENCRYPTED_KEY_FILE.tmp"
+        const val CERTIFICATE_TEMP_FILE = "$CERTIFICATE_FILE.tmp"
         const val AES_TRANSFORMATION = "AES/GCM/NoPadding"
         const val LOOPBACK_HOST = "127.0.0.1"
         const val FORCED_SHUTTER_READ_COMMAND =

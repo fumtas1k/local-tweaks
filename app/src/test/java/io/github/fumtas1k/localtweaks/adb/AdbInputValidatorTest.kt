@@ -20,4 +20,11 @@ class AdbInputValidatorTest {
         assertFalse(AdbInputValidator.isPairingCode("１２３４５６"))
         assertFalse(AdbInputValidator.isPairingCode("123456\n"))
     }
+
+    @Test fun boundedAsciiDigitsRejectsOverlongOrNonAsciiInput() {
+        assertEquals("12345", AdbInputValidator.acceptBoundedAsciiDigits("12345", 5))
+        assertEquals(null, AdbInputValidator.acceptBoundedAsciiDigits("123456", 5))
+        assertEquals(null, AdbInputValidator.acceptBoundedAsciiDigits("１２３", 5))
+        assertEquals(null, AdbInputValidator.acceptBoundedAsciiDigits("12a", 5))
+    }
 }

@@ -2,7 +2,7 @@
 
 Galaxy S26 Ultra自身からLocal ADBへ接続し、Samsung固有のカメラシャッター音強制設定を確認・変更するための、自己管理・自己署名を前提としたAndroidアプリです。
 
-Phase 4のwrite MVPまで完了しています。通常の`Settings.System` APIによる変更はSamsung側に拒否されましたが、Local ADBのpairingと接続に成功し、固定したGETと0/1へのPUTを実行できます。PUT後は同じ接続上で必ずGETし、一致した場合だけ成功として表示します。
+Phase 5のhardeningまで完了しています。通常の`Settings.System` APIによる変更はSamsung側に拒否されましたが、Local ADBのpairingと接続に成功し、固定したGETと0/1へのPUTを実行できます。PUT後は同じ接続上で必ずGETし、一致した場合だけ成功として表示します。
 
 ## 対象操作
 
@@ -44,7 +44,7 @@ settings put system csc_pref_camera_forced_shuttersound_key 1
 3. ✅ Local ADBのpairing、接続、debug限定の固定`echo hello`をPoCする。
 4. ✅ read-only MVPを実装し、実機でraw値を表示する。
 5. ✅ 0/1への変更、read-back verification、資格情報リセットを追加する。
-6. ⏳ dependency verification、manifest検査、backup除外を継続して強化する。
+6. ✅ dependency lock/verification、manifest・artifact・backup・logging検査を追加する。
 
 次のコマンドを使用します。
 
@@ -55,7 +55,7 @@ settings put system csc_pref_camera_forced_shuttersound_key 1
 ./gradlew connectedAndroidTest
 ```
 
-### Phase 4 write MVP
+### Phase 5 hardened MVP
 
 画面でWireless Debuggingの接続用ポートを入力し、`Connect`後に現在値の読み取り、0への変更、1への変更を実行できます。未設定は`Not set`、0/1以外は解釈せずそのまま表示します。書き込み後のread-backが期待値と異なる場合は成功扱いにしません。
 
@@ -64,6 +64,14 @@ settings put system csc_pref_camera_forced_shuttersound_key 1
 ```
 
 ADB資格情報は確認ダイアログから削除できます。削除後はアプリprocessを再起動し、Wireless Debuggingで再pairingしてください。Phase 1/2の一時的なprobe、`WRITE_SETTINGS`、固定`echo hello`は削除済みです。release manifestで許可するpermissionは`INTERNET`だけです。
+
+通常の検証はstrict dependency lockを有効にしたオフラインbuildで実行できます。依存関係を意図的に変更した場合だけlockとchecksumを更新し、差分を確認してください。
+
+```shell
+./gradlew --offline test lint check
+./gradlew :app:dependencies --write-locks
+./gradlew --write-locks --write-verification-metadata sha256 test lint check
+```
 
 ## 開発に参加する場合
 

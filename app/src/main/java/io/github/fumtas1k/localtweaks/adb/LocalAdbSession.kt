@@ -23,7 +23,7 @@ internal class LocalAdbSession private constructor(context: Context) {
     fun pair(port: Int, code: String, onComplete: (Result<Unit>) -> Unit) {
         submit(onComplete) {
             val result = runCatching { manager.pair(port, code) }
-            if (manager.consumeCredentialResetNotice()) throw IOException("ADB credentials were reset")
+            if (manager.consumeCredentialResetNotice()) throw AdbRestartRequiredException()
             if (!result.getOrThrow()) throw IOException("pairing failed")
             Unit
         }
@@ -36,7 +36,7 @@ internal class LocalAdbSession private constructor(context: Context) {
                 return@submit Unit
             }
             val result = runCatching { manager.connect(port) }
-            if (manager.consumeCredentialResetNotice()) throw IOException("ADB credentials were reset")
+            if (manager.consumeCredentialResetNotice()) throw AdbRestartRequiredException()
             if (!result.getOrThrow()) throw IOException("connection failed")
             connectedPort = port
             Unit

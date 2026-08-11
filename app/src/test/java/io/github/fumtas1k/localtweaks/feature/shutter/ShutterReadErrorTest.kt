@@ -1,5 +1,6 @@
 package io.github.fumtas1k.localtweaks.feature.shutter
 
+import io.github.fumtas1k.localtweaks.adb.AdbRestartRequiredException
 import io.github.fumtas1k.localtweaks.adb.LocalAdbSession
 import java.io.IOException
 import org.junit.Assert.assertEquals
@@ -21,6 +22,13 @@ class ShutterReadErrorTest {
         assertEquals(
             ShutterReadError.Timeout,
             mapReadFailure(LocalAdbSession.AdbTimeoutException()),
+        )
+    }
+
+    @Test fun restartRequiredIsDistinctFromTransportFailure() {
+        assertEquals(
+            ShutterReadError.RestartRequired,
+            mapReadFailure(AdbRestartRequiredException()),
         )
     }
 }

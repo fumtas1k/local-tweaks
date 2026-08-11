@@ -44,6 +44,6 @@
     <string name="reset_credentials_confirm">Reset credentials</string>
     <string name="cancel">Cancel</string>
     <string name="reset_credentials_progress">Resetting ADB credentials…</string>
-    <string name="reset_credentials_success">Credentials reset. Restart the app, then pair again.</string>
-    <string name="reset_credentials_failed">Could not reset ADB credentials</string>
+    <string name="restart_required">Restart the app before pairing or using Local ADB again.</string>
+    <string name="reset_credentials_failed">Credential cleanup failed. Restart the app before pairing again.</string>
 </resources>
