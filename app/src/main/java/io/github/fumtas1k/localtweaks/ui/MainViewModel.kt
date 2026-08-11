@@ -43,6 +43,12 @@ internal enum class MainStatus {
     CredentialResetFailed,
 }
 
+internal enum class MainScreen {
+    Home,
+    ConnectionSettings,
+    CameraSettings,
+}
+
 internal data class MainUiState(
     val pairingPort: String = "",
     val connectionPort: String = "",
@@ -50,7 +56,46 @@ internal data class MainUiState(
     val currentValue: ForcedSettingValue? = null,
     val busy: Boolean = false,
     val restartRequired: Boolean = false,
+    val connected: Boolean = false,
+    val screen: MainScreen = MainScreen.Home,
 )
+
+internal fun MainUiState.openHome(): MainUiState =
+    if (restartRequired) copy(screen = MainScreen.ConnectionSettings) else copy(screen = MainScreen.Home)
+
+internal fun MainUiState.openConnectionSettings(): MainUiState =
+    copy(screen = MainScreen.ConnectionSettings)
+
+internal fun MainUiState.openCameraSettings(): MainUiState =
+    if (connected && !restartRequired) copy(screen = MainScreen.CameraSettings) else this
+
+internal fun MainUiState.markConnected(): MainUiState = copy(
+    status = MainStatus.Connected,
+    currentValue = null,
+    busy = false,
+    connected = true,
+).openHome()
+
+internal fun MainUiState.markRestartRequired(): MainUiState = copy(
+    restartRequired = true,
+    connected = false,
+    screen = MainScreen.ConnectionSettings,
+)
+
+internal enum class ForcedShutterSwitchState {
+    On,
+    Off,
+    Disabled,
+}
+
+internal fun forcedShutterSwitchState(value: ForcedSettingValue?): ForcedShutterSwitchState = when (value) {
+    is ForcedSettingValue.Present -> when (value.raw) {
+        "1" -> ForcedShutterSwitchState.On
+        "0" -> ForcedShutterSwitchState.Off
+        else -> ForcedShutterSwitchState.Disabled
+    }
+    null, ForcedSettingValue.NotSet -> ForcedShutterSwitchState.Disabled
+}
 
 internal class MainViewModel(private val session: LocalAdbSession) : ViewModel() {
     private val repository = ShutterRepository(session)
@@ -80,9 +125,8 @@ internal class MainViewModel(private val session: LocalAdbSession) : ViewModel()
                 mutableState.value = current.copy(status = MainStatus.Pairing, busy = true)
                 session.pair(port, code) { result ->
                     mutableState.value = if (result.exceptionOrNull() is AdbRestartRequiredException) {
-                        mutableState.value.copy(
+                        mutableState.value.markRestartRequired().copy(
                             status = MainStatus.RestartRequired,
-                            restartRequired = true,
                             busy = false,
                         )
                     } else {
@@ -107,18 +151,34 @@ internal class MainViewModel(private val session: LocalAdbSession) : ViewModel()
         mutableState.value = current.copy(status = MainStatus.Connecting, busy = true)
         session.connect(port) { result ->
             mutableState.value = if (result.exceptionOrNull() is AdbRestartRequiredException) {
-                mutableState.value.copy(
+                mutableState.value.markRestartRequired().copy(
                     status = MainStatus.RestartRequired,
-                    restartRequired = true,
                     busy = false,
                 )
             } else {
-                mutableState.value.copy(
-                    status = if (result.isSuccess) MainStatus.Connected else MainStatus.ConnectionFailed,
-                    busy = false,
-                )
+                if (result.isSuccess) {
+                    mutableState.value.markConnected()
+                } else {
+                    mutableState.value.copy(
+                        status = MainStatus.ConnectionFailed,
+                        busy = false,
+                        connected = false,
+                    )
+                }
             }
         }
+    }
+
+    fun openHome() {
+        mutableState.value = mutableState.value.openHome()
+    }
+
+    fun openConnectionSettings() {
+        mutableState.value = mutableState.value.openConnectionSettings()
+    }
+
+    fun openCameraSettings() {
+        mutableState.value = mutableState.value.openCameraSettings()
     }
 
     fun read() {
@@ -139,9 +199,14 @@ internal class MainViewModel(private val session: LocalAdbSession) : ViewModel()
                         ShutterReadError.RestartRequired -> MainStatus.RestartRequired
                         ShutterReadError.TransportFailure -> MainStatus.ReadTransportFailed
                     },
-                    restartRequired = result.error is ShutterReadError.RestartRequired,
                     busy = false,
-                )
+                ).let { state ->
+                    if (result.error is ShutterReadError.RestartRequired) {
+                        state.markRestartRequired()
+                    } else {
+                        state
+                    }
+                }
             }
         }
     }
@@ -170,8 +235,7 @@ internal class MainViewModel(private val session: LocalAdbSession) : ViewModel()
                 },
                 currentValue = null,
                 busy = false,
-                restartRequired = true,
-            )
+            ).markRestartRequired()
         }
     }
 
@@ -205,10 +269,9 @@ internal class MainViewModel(private val session: LocalAdbSession) : ViewModel()
                     busy = false,
                 )
             ShutterWriteResult.RestartRequired ->
-                mutableState.value.copy(
+                mutableState.value.markRestartRequired().copy(
                     currentValue = null,
                     status = MainStatus.RestartRequired,
-                    restartRequired = true,
                     busy = false,
                 )
             ShutterWriteResult.TransportFailure ->

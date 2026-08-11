@@ -263,6 +263,8 @@ PUTのexit codeが得られないライブラリでも、read-back mismatchを�
 
 「復元」は元の値が1だと確認できる場合にしか成立しないため、基本ラベルは「強制設定を0に変更」「強制設定を1に変更」とする。元の値が未設定または未知値なら、1への操作を「復元」と表示しない。
 
+UIではraw値`1`をON、`0`をOFFとしてSwitchに対応付ける。null、未設定、0/1以外ではSwitchを無効化し、実際のシャッター音の状態は断定しない。
+
 ## 5. ADB鍵設計
 
 ### 5.1 不採用: Android Keystore RSA鍵を直接利用
@@ -478,6 +480,8 @@ SC-53G実機で完了した。0/1のPUT後に同一Local ADB sessionでGETし、
 - 実機test matrix完了。
 
 SC-53Gの現行buildを対象として完了した。全app configurationをstrict dependency lockとSHA-256 verificationで固定し、releaseのpermission、固定command表、backup設定、production logging、旧probe混入をGradle taskで検査する。資格情報削除または破損回復後は全ADB操作を無効化し、process再起動後だけ再pairingを許可する。
+
+UIは単一Activityのまま、Navigation Compose依存を追加せず、`Home`、`ConnectionSettings`、`CameraSettings`の型付き画面状態で3画面を切り替える。通常起動時は`Home`を表示し、接続成功時も`Home`へ戻す。ホームには接続状態と将来拡張可能な機能カード一覧を置き、接続済みの場合だけカメラ設定カードから`CameraSettings`を開ける。接続設定とカメラ設定からはホームへ戻り、Android Backもホーム以外ではホームへ戻す。`restartRequired`時は安全のため接続設定画面に留める。画面状態、入力値、取得値は`ViewModel`の`StateFlow`で回転をまたいで保持し、ペアリングコードはCompose内の一時状態に限定する。
 
 ## 11. 未解決事項とGo/No-Go
 

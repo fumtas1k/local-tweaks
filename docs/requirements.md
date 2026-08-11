@@ -238,44 +238,61 @@ Android標準のWireless Debuggingを利用する。
 
 Jetpack Composeを使用する。
 
-初期画面は極力小さくする。
+接続操作と設定操作を1画面へ詰め込まず、ホーム、接続設定、カメラ設定の3画面に分ける。Navigation Composeは追加せず、単一Activityの型付き画面状態で切り替える。
 
-例:
-
-```text
-Galaxy Utility
-
-Local ADB
-──────────────
-
-Status
-Connected
-
-Camera shutter sound
-Current value: 1
-
-[ Disable forced shutter sound ]
-
-[ Set forced shutter sound setting to 1 ]
-
-──────────────
-
-Wireless debugging:
-Enabled
-
-ADB pairing:
-Paired
-```
-
-接続されていない場合:
+ホーム画面:
 
 ```text
-Local ADB
+Local Tweaks
+ホーム
 
-Not connected
+接続状態: 未接続
+[ 接続設定を開く ]
 
-[ Pair with Wireless Debugging ]
+機能
+カメラ設定
+接続後に利用できます
+[ 接続設定を開く ]
 ```
+
+接続設定画面:
+
+```text
+Local Tweaks
+接続設定
+
+接続状態: 未接続
+[ 開発者向けオプションを開く ]
+
+接続
+接続ポート
+[ 接続 ]
+
+未ペアリングの場合
+ペアリングポート / 6桁コード
+[ ペアリング ]
+
+← 接続設定
+```
+
+カメラ設定画面:
+
+```text
+Local Tweaks
+カメラ設定
+
+現在の設定: 0
+[ 現在値を更新 ]
+強制シャッター音設定  ON = 1 / OFF = 0  [ Switch ]
+
+← カメラ設定
+```
+
+通常起動時はホーム画面を表示する。ホームのカメラ設定カードは接続済みの場合だけ開ける。接続成功時はホーム画面へ自動遷移し、ホームからカメラ設定を開く。接続設定とカメラ設定からはホームへ戻れる。Android Backもホーム以外ではホームへ戻すが、認証情報削除などでprocess再起動が必要になった場合は接続設定画面に留め、全ADB操作を無効化する。
+
+画面とポート入力・取得値は`ViewModel`で保持し、回転で失わない。ペアリングコードは保存せず、接続設定を離れると破棄する。
+
+system barのInsetを考慮してタイトルと操作がステータスバーやジェスチャーナビに重ならないようにし、狭い画面では縦スクロールできるようにする。
 
 ---
 
@@ -302,8 +319,7 @@ Disable forced shutter sound
 値を`1`にする操作は、変更前の値が`1`だと確認できない場合に「復元」と表現しない。基本ラベルは値への操作を正確に示す。
 
 ```text
-強制設定を0に変更
-強制設定を1に変更
+強制シャッター音設定  ON = 1 / OFF = 0  [ Switch ]
 ```
 
 `0` にしてもカメラアプリ、地域、CSC、One UIバージョン等によって実際の動作が異なる可能性がある。

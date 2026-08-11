@@ -57,7 +57,7 @@ settings put system csc_pref_camera_forced_shuttersound_key 1
 
 ### Phase 5 hardened MVP
 
-画面でWireless Debuggingの接続用ポートを入力し、`Connect`後に現在値の読み取り、0への変更、1への変更を実行できます。未設定は`Not set`、0/1以外は解釈せずそのまま表示します。書き込み後のread-backが期待値と異なる場合は成功扱いにしません。
+通常起動時は「ホーム」画面を表示します。ホームには接続状態と機能一覧があり、「接続設定」画面でWireless Debuggingの接続用ポートを入力して接続します。接続成功後はホームへ戻り、接続済みの「カメラ設定」カードから現在値の読み取りと、raw設定値に対応したON=1／OFF=0のSwitch操作を実行できます。未接続時のカメラ設定カードは利用できず、接続設定へ誘導します。未設定は「未設定」、0/1以外は解釈せずそのまま表示します。書き込み後のread-backが期待値と異なる場合は成功扱いにしません。接続設定とカメラ設定からはホームへ戻れます。
 
 ```shell
 ./gradlew installDebug
