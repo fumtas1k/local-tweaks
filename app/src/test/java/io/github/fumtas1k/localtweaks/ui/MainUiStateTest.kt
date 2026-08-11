@@ -1,5 +1,6 @@
 package io.github.fumtas1k.localtweaks.ui
 
+import io.github.fumtas1k.localtweaks.R
 import io.github.fumtas1k.localtweaks.feature.shutter.ForcedSettingValue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -162,5 +163,17 @@ class MainUiStateTest {
 
     @Test fun restartRequiredIsWarning() {
         assertEquals(MainStatusTone.Warning, mainStatusTone(MainStatus.RestartRequired))
+    }
+
+    @Test fun connectedHomeStatusUsesConnectionSuccessRegardlessOfSharedStatus() {
+        val presentation = connectionStatusPresentation(
+            MainUiState(
+                connected = true,
+                status = MainStatus.ReadComplete,
+            ),
+        )
+
+        assertEquals(MainStatusTone.Success, presentation.tone)
+        assertEquals(R.string.connection_success, presentation.messageRes)
     }
 }

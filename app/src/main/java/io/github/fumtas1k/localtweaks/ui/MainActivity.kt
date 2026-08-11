@@ -357,16 +357,7 @@ private fun ConnectionStatusArea(state: MainUiState, onOpenConnectionSettings: (
     // This area shows connection state only. state.status also carries the
     // result of unrelated operations (read/write/pairing/credential reset)
     // on other screens, which must never leak into this card.
-    val tone = when {
-        state.restartRequired -> MainStatusTone.Warning
-        state.connected -> MainStatusTone.Success
-        else -> MainStatusTone.Neutral
-    }
-    val connectionText = when {
-        state.restartRequired -> stringResource(R.string.restart_required)
-        state.connected -> stringResource(R.string.connection_success)
-        else -> stringResource(R.string.status_not_connected)
-    }
+    val presentation = connectionStatusPresentation(state)
 
     SectionCard {
         Text(stringResource(R.string.adb_connection), style = MaterialTheme.typography.titleMedium)
@@ -376,8 +367,8 @@ private fun ConnectionStatusArea(state: MainUiState, onOpenConnectionSettings: (
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             StatusIndicator(
-                tone = tone,
-                text = stringResource(R.string.status, connectionText),
+                tone = presentation.tone,
+                text = stringResource(R.string.status, stringResource(presentation.messageRes)),
                 modifier = Modifier.weight(1f),
             )
             TextButton(onClick = onOpenConnectionSettings) {
