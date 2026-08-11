@@ -82,6 +82,46 @@ internal fun MainUiState.markRestartRequired(): MainUiState = copy(
     screen = MainScreen.ConnectionSettings,
 )
 
+internal enum class MainStatusTone {
+    Neutral,
+    Progress,
+    Success,
+    Failure,
+    Warning,
+}
+
+internal fun mainStatusTone(status: MainStatus): MainStatusTone = when (status) {
+    MainStatus.NotConnected -> MainStatusTone.Neutral
+    MainStatus.Pairing,
+    MainStatus.Connecting,
+    MainStatus.Reading,
+    MainStatus.SettingZero,
+    MainStatus.SettingOne,
+    MainStatus.CredentialResetting,
+    -> MainStatusTone.Progress
+    MainStatus.Paired,
+    MainStatus.Connected,
+    MainStatus.ReadComplete,
+    MainStatus.SetZeroSuccess,
+    MainStatus.SetOneSuccess,
+    -> MainStatusTone.Success
+    MainStatus.InvalidPairingPort,
+    MainStatus.InvalidPairingCode,
+    MainStatus.PairingFailed,
+    MainStatus.InvalidConnectionPort,
+    MainStatus.ConnectionFailed,
+    MainStatus.InvalidOutput,
+    MainStatus.ReadTimeout,
+    MainStatus.ReadTransportFailed,
+    MainStatus.WriteReadBackMismatch,
+    MainStatus.WriteInvalidOutput,
+    MainStatus.WriteTimeout,
+    MainStatus.WriteTransportFailed,
+    MainStatus.CredentialResetFailed,
+    -> MainStatusTone.Failure
+    MainStatus.RestartRequired -> MainStatusTone.Warning
+}
+
 internal enum class ForcedShutterSwitchState {
     On,
     Off,
