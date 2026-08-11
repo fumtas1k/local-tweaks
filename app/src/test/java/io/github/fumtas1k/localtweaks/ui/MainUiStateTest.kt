@@ -3,6 +3,7 @@ package io.github.fumtas1k.localtweaks.ui
 import io.github.fumtas1k.localtweaks.feature.shutter.ForcedSettingValue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -94,5 +95,72 @@ class MainUiStateTest {
 
     @Test fun missingValueDisablesSwitch() {
         assertEquals(ForcedShutterSwitchState.Disabled, forcedShutterSwitchState(null))
+    }
+
+    @Test fun everyMainStatusHasATone() {
+        for (status in MainStatus.entries) {
+            assertNotNull(mainStatusTone(status))
+        }
+    }
+
+    @Test fun everyToneIsReachedByAtLeastOneStatus() {
+        val reachedTones = MainStatus.entries.map(::mainStatusTone).toSet()
+        assertEquals(MainStatusTone.entries.toSet(), reachedTones)
+    }
+
+    @Test fun notConnectedIsNeutral() {
+        assertEquals(MainStatusTone.Neutral, mainStatusTone(MainStatus.NotConnected))
+    }
+
+    @Test fun inFlightStatusesAreProgress() {
+        val inFlight = setOf(
+            MainStatus.Pairing,
+            MainStatus.Connecting,
+            MainStatus.Reading,
+            MainStatus.SettingZero,
+            MainStatus.SettingOne,
+            MainStatus.CredentialResetting,
+        )
+        for (status in inFlight) {
+            assertEquals(MainStatusTone.Progress, mainStatusTone(status))
+        }
+    }
+
+    @Test fun completedOperationsAreSuccess() {
+        val completed = setOf(
+            MainStatus.Paired,
+            MainStatus.Connected,
+            MainStatus.ReadComplete,
+            MainStatus.SetZeroSuccess,
+            MainStatus.SetOneSuccess,
+        )
+        for (status in completed) {
+            assertEquals(MainStatusTone.Success, mainStatusTone(status))
+        }
+    }
+
+    @Test fun errorsAndInvalidInputAreFailure() {
+        val failures = setOf(
+            MainStatus.InvalidPairingPort,
+            MainStatus.InvalidPairingCode,
+            MainStatus.PairingFailed,
+            MainStatus.InvalidConnectionPort,
+            MainStatus.ConnectionFailed,
+            MainStatus.InvalidOutput,
+            MainStatus.ReadTimeout,
+            MainStatus.ReadTransportFailed,
+            MainStatus.WriteReadBackMismatch,
+            MainStatus.WriteInvalidOutput,
+            MainStatus.WriteTimeout,
+            MainStatus.WriteTransportFailed,
+            MainStatus.CredentialResetFailed,
+        )
+        for (status in failures) {
+            assertEquals(MainStatusTone.Failure, mainStatusTone(status))
+        }
+    }
+
+    @Test fun restartRequiredIsWarning() {
+        assertEquals(MainStatusTone.Warning, mainStatusTone(MainStatus.RestartRequired))
     }
 }
