@@ -4,7 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.github.fumtas1k.localtweaks.adb.AdbInputValidator
 import io.github.fumtas1k.localtweaks.adb.AdbRestartRequiredException
+import io.github.fumtas1k.localtweaks.adb.ConnectionPreferences
 import io.github.fumtas1k.localtweaks.adb.LocalAdbSession
+import io.github.fumtas1k.localtweaks.adb.restoreValidatedConnectionPort
+import io.github.fumtas1k.localtweaks.adb.saveConnectionPortIfConnected
 import io.github.fumtas1k.localtweaks.feature.shutter.ForcedSettingValue
 import io.github.fumtas1k.localtweaks.feature.shutter.ShutterReadError
 import io.github.fumtas1k.localtweaks.feature.shutter.ShutterReadResult
@@ -137,10 +140,22 @@ internal fun forcedShutterSwitchState(value: ForcedSettingValue?): ForcedShutter
     null, ForcedSettingValue.NotSet -> ForcedShutterSwitchState.Disabled
 }
 
-internal class MainViewModel(private val session: LocalAdbSession) : ViewModel() {
+internal class MainViewModel(
+    private val session: LocalAdbSession,
+    private val connectionPreferences: ConnectionPreferences,
+) : ViewModel() {
     private val repository = ShutterRepository(session)
-    private val mutableState = MutableStateFlow(MainUiState())
+    private val mutableState = MutableStateFlow(
+        MainUiState(connectionPort = connectionPreferences.restoreValidatedConnectionPort()),
+    )
     val state: StateFlow<MainUiState> = mutableState.asStateFlow()
+
+    /**
+     * Hint for the pairing section's default expanded/collapsed state only. `true` does not
+     * mean pairing has ever succeeded (see [LocalAdbSession.hasStoredCredentials]), so callers
+     * must always let the user open the section regardless of this value.
+     */
+    val hasStoredCredentialsAtStartup: Boolean = session.hasStoredCredentials()
 
     fun setPairingPort(value: String) {
         AdbInputValidator.acceptBoundedAsciiDigits(value, MAX_PORT_DIGITS)?.let { accepted ->
@@ -190,6 +205,7 @@ internal class MainViewModel(private val session: LocalAdbSession) : ViewModel()
         }
         mutableState.value = current.copy(status = MainStatus.Connecting, busy = true)
         session.connect(port) { result ->
+            connectionPreferences.saveConnectionPortIfConnected(result.isSuccess, current.connectionPort)
             mutableState.value = if (result.exceptionOrNull() is AdbRestartRequiredException) {
                 mutableState.value.markRestartRequired().copy(
                     status = MainStatus.RestartRequired,
@@ -267,6 +283,9 @@ internal class MainViewModel(private val session: LocalAdbSession) : ViewModel()
         if (mutableState.value.busy || mutableState.value.restartRequired) return
         mutableState.value = mutableState.value.copy(status = MainStatus.CredentialResetting, busy = true)
         repository.resetCredentials { result ->
+            // A full re-pairing is required either way (see markRestartRequired below), so the
+            // saved connection port is stale regardless of whether the reset itself succeeded.
+            connectionPreferences.clearConnectionPort()
             mutableState.value = mutableState.value.copy(
                 status = if (result.isSuccess) {
                     MainStatus.RestartRequired
@@ -335,12 +354,12 @@ internal class MainViewModel(private val session: LocalAdbSession) : ViewModel()
     companion object {
         private const val MAX_PORT_DIGITS = 5
 
-        fun factory(session: LocalAdbSession): ViewModelProvider.Factory =
+        fun factory(session: LocalAdbSession, connectionPreferences: ConnectionPreferences): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     require(modelClass.isAssignableFrom(MainViewModel::class.java))
-                    return MainViewModel(session) as T
+                    return MainViewModel(session, connectionPreferences) as T
                 }
             }
     }

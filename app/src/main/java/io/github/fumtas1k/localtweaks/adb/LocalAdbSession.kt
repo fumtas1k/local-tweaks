@@ -63,6 +63,9 @@ internal class LocalAdbSession private constructor(context: Context) {
         }
     }
 
+    /** See [LocalAdbManager.hasStoredCredentials]: a hint only, not proof of a successful pairing. */
+    fun hasStoredCredentials(): Boolean = manager.hasStoredCredentials()
+
     fun resetCredentials(onComplete: (Result<Unit>) -> Unit) {
         submit(onComplete) {
             manager.resetCredentials()

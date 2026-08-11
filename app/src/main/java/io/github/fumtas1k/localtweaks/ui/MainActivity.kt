@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,6 +27,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -53,12 +57,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -69,6 +75,7 @@ import androidx.lifecycle.ViewModelProvider
 import io.github.fumtas1k.localtweaks.R
 import io.github.fumtas1k.localtweaks.adb.AdbInputValidator
 import io.github.fumtas1k.localtweaks.adb.LocalAdbSession
+import io.github.fumtas1k.localtweaks.adb.SharedPreferencesConnectionPreferences
 import io.github.fumtas1k.localtweaks.feature.shutter.ForcedSettingValue
 import io.github.fumtas1k.localtweaks.ui.theme.LocalTweaksTheme
 
@@ -79,7 +86,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         session = LocalAdbSession.getInstance(applicationContext)
-        viewModel = ViewModelProvider(this, MainViewModel.factory(session))[MainViewModel::class.java]
+        val connectionPreferences = SharedPreferencesConnectionPreferences(applicationContext)
+        viewModel = ViewModelProvider(
+            this,
+            MainViewModel.factory(session, connectionPreferences),
+        )[MainViewModel::class.java]
         setContent {
             LocalTweaksTheme {
                 LocalTweaksScreen(viewModel, ::openWirelessDebuggingSettings)
@@ -133,6 +144,7 @@ private fun LocalTweaksScreen(viewModel: MainViewModel, onOpenSettings: () -> Un
                     MainScreen.ConnectionSettings -> ConnectionSettingsScreen(
                         state = state,
                         pairingCode = pairingCode,
+                        pairingSectionDefaultExpanded = !viewModel.hasStoredCredentialsAtStartup,
                         onPairingPortChange = viewModel::setPairingPort,
                         onConnectionPortChange = viewModel::setConnectionPort,
                         onPairingCodeChange = { value ->
@@ -424,6 +436,7 @@ private fun CameraFeatureCard(connected: Boolean, onOpenCameraSettings: () -> Un
 private fun ConnectionSettingsScreen(
     state: MainUiState,
     pairingCode: String,
+    pairingSectionDefaultExpanded: Boolean,
     onPairingPortChange: (String) -> Unit,
     onConnectionPortChange: (String) -> Unit,
     onPairingCodeChange: (String) -> Unit,
@@ -433,6 +446,9 @@ private fun ConnectionSettingsScreen(
     onResetCredentials: () -> Unit,
 ) {
     val actionsEnabled = !state.busy && !state.restartRequired
+    // Default only: hasStoredCredentials doesn't mean pairing ever succeeded, so the user
+    // must always be able to open this section regardless of the starting value.
+    var pairingSectionExpanded by rememberSaveable { mutableStateOf(pairingSectionDefaultExpanded) }
 
     ConnectionStatusHeader(status = state.status)
 
@@ -471,44 +487,69 @@ private fun ConnectionSettingsScreen(
     }
 
     SectionCard {
-        Text(stringResource(R.string.pairing_heading), style = MaterialTheme.typography.titleMedium)
-        OutlinedTextField(
-            value = state.pairingPort,
-            onValueChange = onPairingPortChange,
-            label = { Text(stringResource(R.string.pairing_port)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            isError = state.status == MainStatus.InvalidPairingPort,
-            supportingText = if (state.status == MainStatus.InvalidPairingPort) {
-                { Text(stringResource(R.string.invalid_pairing_port)) }
-            } else {
-                null
-            },
-            enabled = actionsEnabled,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        OutlinedTextField(
-            value = pairingCode,
-            onValueChange = onPairingCodeChange,
-            label = { Text(stringResource(R.string.pairing_code)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-            visualTransformation = PasswordVisualTransformation(),
-            isError = state.status == MainStatus.InvalidPairingCode,
-            supportingText = if (state.status == MainStatus.InvalidPairingCode) {
-                { Text(stringResource(R.string.invalid_pairing_code)) }
-            } else {
-                null
-            },
-            enabled = actionsEnabled,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        TrailingAction {
-            FilledTonalButton(onClick = onPair, enabled = actionsEnabled) {
-                ButtonLabel(
-                    text = stringResource(R.string.pair),
-                    showProgress = state.busy && state.status == MainStatus.Pairing,
-                )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clickable(role = Role.Button) { pairingSectionExpanded = !pairingSectionExpanded },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(stringResource(R.string.pairing_heading), style = MaterialTheme.typography.titleMedium)
+            Icon(
+                imageVector = if (pairingSectionExpanded) {
+                    Icons.Filled.KeyboardArrowUp
+                } else {
+                    Icons.Filled.KeyboardArrowDown
+                },
+                contentDescription = stringResource(
+                    if (pairingSectionExpanded) {
+                        R.string.collapse_pairing_section
+                    } else {
+                        R.string.expand_pairing_section
+                    },
+                ),
+            )
+        }
+        if (pairingSectionExpanded) {
+            OutlinedTextField(
+                value = state.pairingPort,
+                onValueChange = onPairingPortChange,
+                label = { Text(stringResource(R.string.pairing_port)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                isError = state.status == MainStatus.InvalidPairingPort,
+                supportingText = if (state.status == MainStatus.InvalidPairingPort) {
+                    { Text(stringResource(R.string.invalid_pairing_port)) }
+                } else {
+                    null
+                },
+                enabled = actionsEnabled,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = pairingCode,
+                onValueChange = onPairingCodeChange,
+                label = { Text(stringResource(R.string.pairing_code)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                visualTransformation = PasswordVisualTransformation(),
+                isError = state.status == MainStatus.InvalidPairingCode,
+                supportingText = if (state.status == MainStatus.InvalidPairingCode) {
+                    { Text(stringResource(R.string.invalid_pairing_code)) }
+                } else {
+                    null
+                },
+                enabled = actionsEnabled,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            TrailingAction {
+                FilledTonalButton(onClick = onPair, enabled = actionsEnabled) {
+                    ButtonLabel(
+                        text = stringResource(R.string.pair),
+                        showProgress = state.busy && state.status == MainStatus.Pairing,
+                    )
+                }
             }
         }
     }
@@ -710,6 +751,7 @@ private fun ConnectionSettingsScreenLightPreview() {
         ConnectionSettingsScreen(
             state = MainUiState(),
             pairingCode = "",
+            pairingSectionDefaultExpanded = true,
             onPairingPortChange = {},
             onConnectionPortChange = {},
             onPairingCodeChange = {},
@@ -728,6 +770,7 @@ private fun ConnectionSettingsScreenDarkPreview() {
         ConnectionSettingsScreen(
             state = MainUiState(restartRequired = true, status = MainStatus.RestartRequired),
             pairingCode = "",
+            pairingSectionDefaultExpanded = false,
             onPairingPortChange = {},
             onConnectionPortChange = {},
             onPairingCodeChange = {},

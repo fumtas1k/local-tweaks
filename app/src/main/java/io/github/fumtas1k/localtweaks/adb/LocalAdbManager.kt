@@ -100,6 +100,16 @@ internal class LocalAdbManager(private val context: Context) : AbsAdbConnectionM
         reset
     }
 
+    /**
+     * Whether this app already has locally stored ADB credential material.
+     *
+     * Credentials are created lazily on the first pairing/connection attempt (see
+     * [loadCredentials]), not only after a successful pairing. A `true` result here does not
+     * mean pairing has ever succeeded; treat it only as a hint (e.g. for a default UI state),
+     * never as proof of a working pairing.
+     */
+    fun hasStoredCredentials(): Boolean = synchronized(credentialLock) { hasStoredCredentialFiles() }
+
     private fun checkNotRestarted() {
         if (processRestartRequired) throw AdbRestartRequiredException()
     }
