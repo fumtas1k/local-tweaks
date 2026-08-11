@@ -150,7 +150,7 @@ private val LOCAL_ADB_ADDRESS = InetAddress.getByAddress(
 - `1..65535` の範囲。
 - 先頭・末尾の空白だけは除去する。
 - hostname、IPv4、IPv6、URI、区切り文字を受け付けない。
-- 保存しない。画面回転中のstateに残す場合もプロセス内だけにする。
+- pairing portは保存しない。connection portは3.5の方針に従い保存する。
 
 ライブラリへ渡す直前にもhostがloopbackであることをassertする。テストではLANアドレスやhostnameを渡せるpublic APIが存在しないことを確認する。
 
