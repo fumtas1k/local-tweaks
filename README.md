@@ -2,7 +2,7 @@
 
 Galaxy S26 Ultra自身からLocal ADBへ接続し、Samsung固有のカメラシャッター音強制設定を確認・変更するための、自己管理・自己署名を前提としたAndroidアプリです。
 
-現在はPhase 2の準備段階です。Macからの実機確認は成功しましたが、通常の`Settings.System` APIによる変更はSamsung側に拒否されました。次はLocal ADBのpairingと固定`echo hello`を検証します。Local ADBを使うMVPはまだありません。
+Phase 2のLocal ADB PoCまで完了しています。通常の`Settings.System` APIによる変更はSamsung側に拒否されましたが、USBを外した実機でLocal ADBのpairing、接続、固定`echo hello`に成功しました。設定を扱うMVPはまだありません。
 
 ## 対象操作
 
@@ -41,8 +41,8 @@ settings put system csc_pref_camera_forced_shuttersound_key 1
 
 1. ✅ Galaxy S26 Ultra実機で対象settingのGET・PUT・read-backを確認する。
 2. ✅ debug variantで通常の`Settings.System` APIを検証し、変更不可を確認する。
-3. ⏳ Local ADBのpairing、接続、debug限定の固定`echo hello`をPoCする。
-4. read-only MVPを実装する。
+3. ✅ Local ADBのpairing、接続、debug限定の固定`echo hello`をPoCする。
+4. ⏳ read-only MVPを実装する。
 5. 0/1への変更とread-back verificationを追加する。
 6. dependency verification、manifest検査、backup除外を行う。
 

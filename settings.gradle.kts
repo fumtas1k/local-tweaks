@@ -11,6 +11,14 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        exclusiveContent {
+            forRepository {
+                maven("https://jitpack.io")
+            }
+            filter {
+                includeGroupByRegex("com\\.github\\.MuntashirAkon.*")
+            }
+        }
     }
 }
 

@@ -77,4 +77,41 @@ MacとのUSB ADB接続が途中で切れ、Gradleから`No connected devices`と
 
 [Samsung公式仕様](https://www.samsung.com/us/support/answer/ANS10003636/)でも、Auto BlockerはUSBケーブル経由のcommandを遮断する。実機では手動でOFFにした後、時間経過後に再びONになっていたことを観測したが、再有効化の正確な条件は未確認である。USB ADBを使う開発作業の前にAuto Blockerの状態を確認する。
 
-この観測だけでは、Auto BlockerがWireless Debugging経由のLocal ADBも遮断すると判断しない。Phase 2でUSB接続を外した状態のpairing、接続、固定command実行を別途検証する。
+Phase 2の検証中にもAuto Blockerが再びONになり、USB経由のAPKインストールが途中で失敗して実機がADB一覧から消えた。OFFへ戻した直後は`unauthorized`となり、端末上でUSBデバッグを再許可すると復旧した。再有効化の条件は引き続き不明である。
+
+この観測だけでは、Auto BlockerがWireless Debugging経由のLocal ADBも遮断すると判断しない。今回のLocal ADB検証はAuto BlockerをOFFにし、USBケーブルを外した状態で行った。
+
+## Phase 2: Local ADB PoC
+
+PoCはdebug buildだけに`libadb-android` 3.1.1、pairing UI、固定`echo hello`を追加した。接続先hostはコード内の`127.0.0.1`に固定し、入力欄はペアリング用ポート、ASCII 6桁コード、接続用ポートだけとした。
+
+### Android Keystore RSA直接利用
+
+最初に、Android Keystoreで生成したnon-exportable RSA private keyをTLS key managerへ直接渡した。custom ConscryptとAndroid標準TLS providerの両方でPairを試したが、いずれもTLS handshake中のRSA処理で失敗した。
+
+```text
+SSLHandshakeException: ... RSA routines:OPENSSL_internal:internal error
+```
+
+custom Conscryptでは`native_crypto.cc:741`、標準providerでは`native_crypto.cc:690`付近の同種エラーだった。この端末と`libadb-android` 3.1.1の組み合わせでは、Android Keystore RSA鍵の直接利用を不採用とする。
+
+### AES-GCM保護したsoftware RSA鍵
+
+software RSA 2048 key pairへ切り替え、PKCS#8 private keyをAndroid Keystore内のnon-exportable AES-256-GCM鍵で暗号化してアプリprivate storageへ保存した。平文private keyのencoded byte array、GCM IV、暗号文の一時byte arrayは処理後に上書きする。manifestではbackupを無効化し、data extraction rulesでもアプリデータをcloud backupとdevice transferから除外している。
+
+USBケーブルを外し、Wi-FiとWireless DebuggingをONにした状態で次を確認した。
+
+| 操作 | 結果 |
+|---|---|
+| `127.0.0.1:<pairing-port>`へ6桁コードでPair | 成功 |
+| `127.0.0.1:<connection-port>`へ接続 | 成功 |
+| debug固定`echo hello` | `hello` |
+| APK上書き後、保存済み資格情報で再接続 | 成功、再pairing不要 |
+
+最初のecho試行では、remote commandの正常終了をライブラリがEOFではなく`IOException: Stream closed.`として返した。受信済み出力を保持し、この既知のclose通知だけをEOFとして扱うよう修正した後、応答が正確に`hello`であることを確認した。
+
+コードレビュー後、資格情報破損時の安全な削除と再pairing案内、process内で直列化したADB session、stream read timeout、応答上限、ランダムな証明書serialを追加した。既存のペアリング資格情報を保持したままAPKを上書きし、USBを外した実機で再度`Connect`と固定`echo hello`を実行して`hello`を確認した。
+
+## Phase 2判定
+
+SC-53Gの現行buildでは`libadb-android`方式を条件付き採用とする。Android Keystore RSA鍵の直接利用は避け、AES-GCMで保護したsoftware RSA鍵を使う。Phase 3では汎用stream APIをinfrastructure内部へ閉じ込め、固定のsetting GETだけを実装する。

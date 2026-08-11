@@ -22,8 +22,8 @@ LocalAdbGateway
 - LADBは動作方式の参考にするが、コードやプリビルド `libadb.so` は取り込まない。
 - MVPではmDNS discoveryを実装しない。
 - 接続先ホストはコードで `127.0.0.1` に固定し、ユーザーが入力できるのはポート番号と6桁のペアリングコードだけにする。
-- ADB鍵は、まずAndroid Keystore内の非exportable RSA鍵を直接使えるかPoCで確認する。
-- 直接利用できない場合だけ、KeystoreのAES-GCM鍵で暗号化したADB秘密鍵をアプリprivate storageへ保存する。
+- Android Keystore内の非exportable RSA鍵を直接使う方式は、実機TLS handshakeで失敗したため不採用とする。
+- software RSA秘密鍵をKeystoreのAES-256-GCM鍵で暗号化し、アプリprivate storageへ保存する。
 - releaseビルドで実行できる操作は設定値のGET、0へのPUT、1へのPUTだけとする。
 
 この設計はGalaxy S26 Ultraの出荷時環境であるAndroid 16 / One UI 8.5を基準とする。One UI 9 betaを含む将来アップデートは実機回帰テストの対象にする。
@@ -102,7 +102,22 @@ LADBから採用するのは、次の運用上の知見だけとする。
 - LGPL-3.0のSPAKE2依存について、再配布時のnotice・source提供・改変/再リンク要件を満たせる。
 - アプリからライブラリの汎用shell APIを公開しない。
 
-PoCではJitPackの可変なブランチ指定を使わず、既知のversionまたはcommitへ固定する。MVPへ進む前にAARと推移的依存を取得してchecksumをdependency verificationへ登録する。
+PoCではJitPackの可変なブランチ指定を使わず、既知のversionまたはcommitへ固定する。解決済みAARと推移的依存のchecksumは`gradle/verification-metadata.xml`へ登録し、Gradleの依存検証で監査する。
+
+### 2.6 Phase 2で解決した依存物
+
+Local ADB関連dependencyはdebug configurationだけに置く。JitPackは`com.github.MuntashirAkon`配下だけをexclusive content filterで許可する。
+
+| artifact | version / source | SHA-256 |
+|---|---|---|
+| `libadb-android` AAR | 3.1.1 / tag commit `c849886ebc6d48e7b46d967e78a6bb65c90c3b74` | `e6fcb495a20a507ca4a125afc9c554e838a84b3a15fbcc29f7deafd0f88bbb58` |
+| `spake2-android` AAR | 2.2.1 / tag commit `7615ddd680b990e14513ebb66eac4cb0dbf82464` | `8798fb6c04b5d53a6307ed9481e9afe563227abd4e8b9e917c8514fa850071bb` |
+| `bcprov-jdk15to18` JAR | 1.81 | `0ef9c4d9536719aaa1c92a7c694d87981fa9d4d64dd9479cc322a08aebbc651e` |
+| `bcpkix-jdk15to18` JAR | 1.81 | `aa204a0c8b5f5564bf2b1a055e2550534b24217b23f63ea4cb762c908ff811d9` |
+| `bcutil-jdk15to18` JAR | 1.81 | `82fc2c3bc17c06a6fc4e28b73adf1601a01b91a97f7b72c0cfbabaf8bf1f3fe7` |
+| `conscrypt-android` AAR | 2.5.3 | `551ae4e301c571760d1791e647db6ed1dcb10d34dcae7aa12b67f220f2ce98d1` |
+
+`libadb-android`はApache-2.0選択、ConscryptはApache-2.0、Bouncy Castleは同プロジェクトのpermissive licenseとして扱う。`spake2-android`はLGPL-3.0であり、配布前にnoticeとsource提供手順を実装する。checksumは今回解決したbinaryの監査記録であり、Release runtime classpathへdebug依存が混入しないGradle検査も実行する。
 
 ## 3. 接続設計
 
@@ -250,29 +265,22 @@ PUTのexit codeが得られないライブラリでも、read-back mismatchを�
 
 ## 5. ADB鍵設計
 
-### 5.1 第一案: Android Keystore RSA鍵を直接利用
+### 5.1 不採用: Android Keystore RSA鍵を直接利用
 
 RSA 2048 key pairを `AndroidKeyStore` providerで生成する。private key materialはexportできず、公開鍵とX.509 certificateは取得できる。
 
-PoCで確認する項目:
+SC-53G実機では、custom ConscryptとAndroid標準TLS providerの両方でRSA処理の内部エラーとなりpairingできなかった。`libadb-android`のTLS key managerとnon-exportable Android Keystore RSA private keyの組み合わせには互換性がないと判断する。詳細は[`device-validation.md`](device-validation.md)を参照する。
 
-- `libadb-android` のTLS key managerへAndroidKeyStoreのPrivateKeyを渡せる。
-- TLS 1.3で必要な署名方式をKeystoreが許可する。
-- ADB pairingと再接続の両方が成功する。
-- 画面ロック解除を毎回要求しない設定でバックグラウンド再接続できる。
+### 5.2 採用: encrypted PKCS#8
 
-鍵用途は署名だけに限定し、必要なdigestとRSA paddingだけを許可する。実際の許可集合はTLS handshakeログではなく、PoCテスト結果を基に最小化する。
-
-### 5.2 fallback: encrypted PKCS#8
-
-ライブラリがexport可能なPKCS#8 private keyを要求する場合のみfallbackを使う。
+software RSA 2048 key pairを生成し、PKCS#8 private keyを暗号化保存する。
 
 ```text
 Android Keystore AES-256-GCM key
   ↓ encrypt/decrypt
 PKCS#8 ADB private key ciphertext
   ↓
-noBackupFilesDir
+app private files（backup/transfer除外）
 ```
 
 - AES keyはnon-exportable。
@@ -282,12 +290,14 @@ noBackupFilesDir
 - Java PrivateKey objectの完全なzeroizeは保証できないため、process lifetimeを越えて保持しない。
 - 復号・parse失敗時は鍵を再生成し、ユーザーへ再pairingを案内する。
 
+この方式で実機のpairing、接続、アプリ再インストール後の再接続、固定`echo hello`まで成功した。
+
 ### 5.3 Backupと削除
 
 - manifestで `android:allowBackup="false"` を明示する。
 - Android 12以降のdevice-to-device transfer差異に備え、`dataExtractionRules` でもcloud backupとdevice transferから資格情報を除外する。
 - ADB資格情報、connection port、pairing codeをbackup対象にしない。
-- 「ADB資格情報を削除」でKeystore aliasとfallback ciphertextを削除する。
+- 「ADB資格情報を削除」でKeystore aliasと暗号化秘密鍵ファイルを削除し、libadbのTLS状態を避けるためプロセス再起動後の再pairingを案内する。
 - アプリアンインストール後は再pairingが必要であることを正常動作とする。
 
 ## 6. Android権限
@@ -440,6 +450,8 @@ dependency lock/checksum
 - Android Keystore直接利用を同時に検証する。
 - library version/commit、推移的依存、license、checksumを記録する。
 
+SC-53G実機で完了した。直接Keystore RSA方式は不採用となり、AES-GCM保護したsoftware RSA方式でpairing、接続、固定`echo hello`に成功した。
+
 PoC終了時に、`libadb-android` 継続かAOSP native方式への切替をdecision recordとして残す。
 
 ### Phase 3: Read-only MVP
@@ -465,13 +477,13 @@ PoC終了時に、`libadb-android` 継続かAOSP native方式への切替をdeci
 
 ## 11. 未解決事項とGo/No-Go
 
-次はコードだけでは確定できず、実機検証が必要。
+次はコードだけでは確定できず、追加の実機検証が必要。
 
-- Galaxy S26 Ultraの現在のfirmwareで `127.0.0.1` pairing/connectが両方可能か。
-- Android Keystore RSA private keyを `libadb-android` のTLS pairingで直接使えるか。
 - `settings` commandが対象キーを現在も書き換えられるか。
 - Samsung Cameraが0/1をどう解釈するか。
 - One UI 9 beta/stableで挙動が維持されるか。
+
+SC-53Gの現行buildでは`127.0.0.1`へのpair/connectが成功した。Android Keystore RSA private keyの直接利用は失敗し、AES-GCM保護したsoftware RSA方式で成功した。settingのADB書き換えとCamera挙動はMac ADBでは確認済みだが、Local ADB実装からはPhase 4で再検証する。
 
 No-Go条件:
 
