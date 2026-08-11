@@ -23,8 +23,8 @@
 | 用途 | ロール |
 | --- | --- |
 | 画面背景 | `background` |
-| セクションカード | `surfaceContainer` |
-| 無効なカード | `surfaceContainerLowest` + `onSurfaceVariant`の文字 |
+| セクションカード | `surfaceContainerHigh` |
+| 無効なカード | `surfaceContainerLow` + `onSurfaceVariant`の文字 |
 | 成功状態 | `primary` |
 | 失敗・入力エラー | `error` |
 | 要再起動の警告 | `errorContainer` / `onErrorContainer` |
