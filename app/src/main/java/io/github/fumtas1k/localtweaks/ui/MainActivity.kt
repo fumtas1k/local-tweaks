@@ -7,6 +7,7 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -32,6 +33,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -436,7 +438,7 @@ private fun ConnectionSettingsScreen(
 
     SectionCard {
         Text(stringResource(R.string.wireless_debugging), style = MaterialTheme.typography.titleMedium)
-        OutlinedButton(onClick = onOpenSettings, enabled = actionsEnabled) {
+        FilledTonalButton(onClick = onOpenSettings, enabled = actionsEnabled) {
             Text(stringResource(R.string.open_developer_settings))
         }
     }
@@ -502,7 +504,7 @@ private fun ConnectionSettingsScreen(
             modifier = Modifier.fillMaxWidth(),
         )
         TrailingAction {
-            OutlinedButton(onClick = onPair, enabled = actionsEnabled) {
+            FilledTonalButton(onClick = onPair, enabled = actionsEnabled) {
                 ButtonLabel(
                     text = stringResource(R.string.pair),
                     showProgress = state.busy && state.status == MainStatus.Pairing,
@@ -518,10 +520,18 @@ private fun ConnectionSettingsScreen(
         Text(stringResource(R.string.danger_zone), style = MaterialTheme.typography.titleMedium)
         Text(stringResource(R.string.reset_credentials_description))
         TrailingAction {
-            TextButton(
+            OutlinedButton(
                 onClick = onResetCredentials,
                 enabled = actionsEnabled,
-                colors = ButtonDefaults.textButtonColors(
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = if (actionsEnabled) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.error.copy(alpha = 0.38f)
+                    },
+                ),
+                colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = MaterialTheme.colorScheme.error,
                     disabledContentColor = MaterialTheme.colorScheme.error.copy(alpha = 0.38f),
                 ),
