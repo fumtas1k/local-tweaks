@@ -54,6 +54,17 @@ class MainUiStateTest {
         assertEquals(ForcedSettingValue.Present("unknown"), state.currentValue)
     }
 
+    @Test fun openingConnectionSettingsNormalizesConnectedStatus() {
+        val state = MainUiState(
+            connected = true,
+            status = MainStatus.ReadComplete,
+            screen = MainScreen.CameraSettings,
+        ).openConnectionSettings()
+
+        assertEquals(MainScreen.ConnectionSettings, state.screen)
+        assertEquals(MainStatus.Connected, state.status)
+    }
+
     @Test fun restartRequiredReturnsToConnectionSettingsAndBlocksHome() {
         val state = MainUiState(
             connected = true,

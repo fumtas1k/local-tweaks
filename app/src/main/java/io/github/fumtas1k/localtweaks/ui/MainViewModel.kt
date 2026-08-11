@@ -68,7 +68,14 @@ internal fun MainUiState.openHome(): MainUiState =
     if (restartRequired) copy(screen = MainScreen.ConnectionSettings) else copy(screen = MainScreen.Home)
 
 internal fun MainUiState.openConnectionSettings(): MainUiState =
-    copy(screen = MainScreen.ConnectionSettings)
+    copy(
+        screen = MainScreen.ConnectionSettings,
+        status = when {
+            restartRequired -> MainStatus.RestartRequired
+            connected -> MainStatus.Connected
+            else -> MainStatus.NotConnected
+        },
+    )
 
 internal fun MainUiState.openCameraSettings(): MainUiState =
     if (connected && !restartRequired) copy(screen = MainScreen.CameraSettings) else this
