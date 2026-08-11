@@ -30,6 +30,16 @@
 | 要再起動の警告 | `errorContainer` / `onErrorContainer` |
 | 補助説明 | `onSurfaceVariant` |
 
+ボタンは強調度の三段階（主要・補助・危険）を種別で区別し、色の上書きで表現しない。3種とも「押せる要素」と分かる見た目（塗り、薄い塗り、枠線のいずれか）を保つこと。文字だけのボタン（`TextButton`）は、ページ内リンクのようなナビゲーション操作（例: ホームの「接続する」）にだけ使い、実際の操作を伴う主要・補助・危険操作には使わない。
+
+| 強調度 | コンポーネント | 色 |
+| --- | --- | --- |
+| 主要操作 | `Button` | 既定（`primary` / `onPrimary`の塗り） |
+| 補助操作 | `FilledTonalButton` | 既定（`secondaryContainer` / `onSecondaryContainer`の薄い塗り、色の上書き不要） |
+| 危険操作 | `OutlinedButton` | `error`色の枠線と文字。塗りにはしない（主要操作と同じ重みになり、破壊的操作を誘うため） |
+
+主要操作・補助操作は色を上書きしないため、`enabled = false`時も`ButtonDefaults`の既定disabled配色がそのまま効く。危険操作は`contentColor`と`border`を`error`色に上書きしているため、`disabledContentColor`と、無効時の`border`色（`error.copy(alpha = 0.38f)`など）も必ず明示すること。`Card`や`TextButton`で`containerColor`/`contentColor`だけを渡して`disabled*`を渡し忘れた過去の不具合と同じ性質なので、色を上書きするボタンでは常に無効時の見た目を確認する。
+
 ## アイコン
 
 戻る・シェブロン・状態表示を文字リテラル（`←` `›`）で描画しない。`androidx.compose.material:material-icons-core`の`ImageVector`を使う。
@@ -137,9 +147,9 @@ Top App BarとScaffoldのcontent paddingでsystem barを避ける。本文は16d
 ```
 
 - 接続状態は情報表示だけとし、戻る操作を入れない。状態行はカードの外に置き、画面全体の状態であることを示す。
-- 接続を主要操作（`Button`）、ペアリングを初回・復旧時の補助操作（`OutlinedButton`）として扱う。
+- 接続を主要操作（`Button`）、ペアリングを初回・復旧時の補助操作（`FilledTonalButton`）として扱う。
 - 主要操作ボタンはセクションカード内で右寄せにし、入力欄との縦位置関係を固定する。
-- 認証情報リセットは画面末尾の独立したカードに置き、`errorContainer`を背景、`error`を文字色とする。通常の主要ボタンと同じ表現にしない。
+- 認証情報リセットは画面末尾の独立したカードに置き、`errorContainer`を背景、`error`を文字色とする。ボタンは`OutlinedButton`に`error`色の枠線と文字を与えた危険操作として表現し、塗りボタン（`Button`/`FilledTonalButton`）にはしない。通常の主要ボタンと同じ表現にしない。
 - 接続成功時はホームへ戻る。ペアリング成功時は接続設定に留まる。
 - `restartRequired`のときは、画面最上部に`Warning`の状態表示を固定し、すべての入力とボタンを無効化する。
 
