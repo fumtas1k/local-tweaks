@@ -208,12 +208,14 @@ private fun LocalTweaksTopAppBar(
 /**
  * A single labelled section of a screen: a `titleMedium` heading followed by
  * body content and, optionally, an action - all inside a [Card] on
- * [MaterialTheme.colorScheme.surfaceContainer] unless overridden.
+ * [MaterialTheme.colorScheme.surfaceContainerHigh] unless overridden. This
+ * sits above the screen background and above disabled cards (see
+ * [CameraFeatureCard]) in both light and dark themes.
  */
 @Composable
 private fun SectionCard(
     modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
     contentColor: Color = contentColorFor(containerColor),
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -334,6 +336,20 @@ private fun HomeScreen(
 
 @Composable
 private fun ConnectionStatusArea(state: MainUiState, onOpenConnectionSettings: () -> Unit) {
+    // This area shows connection state only. state.status also carries the
+    // result of unrelated operations (read/write/pairing/credential reset)
+    // on other screens, which must never leak into this card.
+    val tone = when {
+        state.restartRequired -> MainStatusTone.Warning
+        state.connected -> MainStatusTone.Success
+        else -> MainStatusTone.Neutral
+    }
+    val connectionText = when {
+        state.restartRequired -> stringResource(R.string.restart_required)
+        state.connected -> stringResource(R.string.connection_success)
+        else -> stringResource(R.string.status_not_connected)
+    }
+
     SectionCard {
         Text(stringResource(R.string.adb_connection), style = MaterialTheme.typography.titleMedium)
         Row(
@@ -342,8 +358,9 @@ private fun ConnectionStatusArea(state: MainUiState, onOpenConnectionSettings: (
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             StatusIndicator(
-                tone = mainStatusTone(state.status),
-                text = stringResource(R.string.status, statusText(state.status)),
+                tone = tone,
+                text = stringResource(R.string.status, connectionText),
+                modifier = Modifier.weight(1f),
             )
             TextButton(onClick = onOpenConnectionSettings) {
                 Text(
@@ -370,9 +387,9 @@ private fun CameraFeatureCard(connected: Boolean, onOpenCameraSettings: () -> Un
         enabled = connected,
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
     ) {
