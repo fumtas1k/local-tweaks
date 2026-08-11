@@ -222,9 +222,9 @@ private fun LocalTweaksTopAppBar(
 /**
  * A single labelled section of a screen: a `titleMedium` heading followed by
  * body content and, optionally, an action - all inside a [Card] on
- * [MaterialTheme.colorScheme.surfaceContainerHigh] unless overridden. This
- * sits above the screen background and above disabled cards (see
- * [CameraFeatureCard]) in both light and dark themes.
+ * [MaterialTheme.colorScheme.surfaceContainerHigh] unless overridden. The tonal
+ * order is background < disabled card < section card in both themes; a disabled
+ * card must stay distinguishable from the background (see [CameraFeatureCard]).
  */
 @Composable
 private fun SectionCard(
@@ -403,7 +403,7 @@ private fun CameraFeatureCard(connected: Boolean, onOpenCameraSettings: () -> Un
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
     ) {
@@ -554,9 +554,11 @@ private fun ConnectionSettingsScreen(
         }
     }
 
+    // The card body stays on the palette's guaranteed errorContainer/onErrorContainer
+    // pairing; only the reset button itself drops to `error` for danger emphasis.
     SectionCard(
         containerColor = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.error,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
     ) {
         Text(stringResource(R.string.danger_zone), style = MaterialTheme.typography.titleMedium)
         Text(stringResource(R.string.reset_credentials_description))
