@@ -65,7 +65,7 @@
 - `Success`は`CheckCircle` + `primary`。
 - `Failure`は`Error` + `error`。
 - `Warning`は`Warning` + `onErrorContainer`、背景に`errorContainer`を敷く。`restartRequired`の間はこの表示を接続設定の最上部に固定する。
-- `state.busy`が`true`の間、実行中のボタンはラベルを保ったまま先頭に16dpの`CircularProgressIndicator`を表示する。ボタンの幅が変動しないよう、非表示時も同じ幅の`Spacer`を確保する。
+- `state.busy`が`true`の間、実行中のボタンはラベルを保ったまま先頭に16dpの`CircularProgressIndicator`を表示する。ラベルの反対側にも同じ16dpの`Spacer`を置き、表示・非表示の切り替えでボタン幅が変動せず、かつラベルが中央に保たれるようにする。
 
 入力エラー（`InvalidPairingPort` / `InvalidPairingCode` / `InvalidConnectionPort`）は、画面上部の状態行だけでなく、対応する`OutlinedTextField`の`isError`と`supportingText`にも反映する。状態行にしか出さない扱いはしない。
 
@@ -87,7 +87,7 @@ Top App BarとScaffoldのcontent paddingでsystem barを避ける。本文は16d
 ├─────────────────────────┤
 │ ┌─────────────────────┐ │
 │ │ ADB接続              │ │
-│ │ ⓘ 未接続    [接続する]│ │
+│ │ 未接続      [接続する]│ │
 │ └─────────────────────┘ │
 │                         │
 │ 機能                     │
@@ -111,7 +111,7 @@ Top App BarとScaffoldのcontent paddingでsystem barを避ける。本文は16d
 ┌─────────────────────────┐
 │ ←  接続設定              │
 ├─────────────────────────┤
-│ ⓘ 状態: 未接続           │
+│ 状態: 未接続             │
 │                         │
 │ ┌─────────────────────┐ │
 │ │ ワイヤレスデバッグ    │ │
