@@ -24,6 +24,8 @@
     <string name="pairing_success">ペアリングしました</string>
     <string name="pairing_failed">ペアリングに失敗しました</string>
     <string name="pair">ペアリング</string>
+    <string name="expand_pairing_section">ペアリングセクションを開く</string>
+    <string name="collapse_pairing_section">ペアリングセクションを閉じる</string>
     <string name="connection_port">接続ポート</string>
     <string name="invalid_connection_port">接続ポートが正しくありません</string>
     <string name="connecting_progress">接続中…</string>

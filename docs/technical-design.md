@@ -189,10 +189,22 @@ pairing codeは6桁のASCII数字として検証し、pairing呼び出し後す�
 ADB認証鍵はペアリング後も有効だが、connection portは変わる可能性がある。
 
 - アプリ起動時に自動でポートscanしない。
-- 直前のconnection portを永続保存しない。
-- 接続が切れたら現在のconnection portを再入力してもらう。
+- 直前のconnection portのみ永続保存し、次回起動時にプリセットする（詳細は3.5）。pairing portは永続保存しない。
+- 接続が切れたら現在のconnection portを確認・再入力してもらう。
 - 認証失敗時は、設定画面で本アプリのpaired deviceをForgetしてから再pairingする導線を出す。
-- アプリ内に「ADB資格情報を削除」操作を用意し、Keystore aliasと関連ファイルを削除する。
+- アプリ内に「ADB資格情報を削除」操作を用意し、Keystore aliasと関連ファイル、永続化したconnection portを削除する。
+
+### 3.5 接続用ポートの永続化
+
+pairing port・接続後のconnection portはどちらも初期化時は空文字列で、`ViewModel`の`StateFlow`が画面回転をまたいで保持する。このうちconnection portだけを、アプリ独自の`SharedPreferences`（`Context.MODE_PRIVATE`、ファイル名`connection_preferences`）へプロセス再起動をまたいで永続化する。
+
+- 保存先: `adb/ConnectionPreferences.kt`の`ConnectionPreferences`インターフェースと、`SharedPreferences`実装の`SharedPreferencesConnectionPreferences`。`MainViewModel`はインターフェースだけに依存し、`MainViewModel.factory`経由でContextを持たないまま注入される。テストでは`ConnectionPreferences`をfake実装に差し替える。
+- 保存タイミング: 接続成功時のみ。入力途中の値、接続失敗時やaborted時の値は保存しない。
+- 復元タイミング: `MainViewModel`初期化時に読み出し、`AdbInputValidator.parsePort`で再検証する。範囲外・非数字などの不正な値は空文字として扱い、`InvalidConnectionPort`と同じ検証ロジックを再利用する。
+- pairing portは永続化しない。ペアリングダイアログを開くたびに値が変わるため、古い値を残すと誤入力を誘発するだけで意味がない。
+- pairing codeは3.3のとおり、そもそも一切永続化しない。
+- 「ADB資格情報を削除」操作時は、永続化したconnection portも削除する。認証情報リセット後はプロセス再起動を伴う完全な再ペアリング導線になるため、古いconnection portを残さない。
+- `AndroidManifest.xml`の`android:allowBackup="false"`と、`dataExtractionRules`の`sharedpref`ドメイン除外（cloud-backup / device-transfer両方）により、この`SharedPreferences`ファイルは端末外（cloud backup、device-to-device transfer）のどちらにも含まれない。`VerifyReleaseManifestTask`がこの除外設定を検証している。
 
 ## 4. コマンド実行境界
 
@@ -297,9 +309,9 @@ app private files（backup/transfer除外）
 ### 5.3 Backupと削除
 
 - manifestで `android:allowBackup="false"` を明示する。
-- Android 12以降のdevice-to-device transfer差異に備え、`dataExtractionRules` でもcloud backupとdevice transferから資格情報を除外する。
-- ADB資格情報、connection port、pairing codeをbackup対象にしない。
-- 「ADB資格情報を削除」でKeystore aliasと暗号化秘密鍵ファイルを削除し、libadbのTLS状態を避けるためプロセス再起動後の再pairingを案内する。
+- Android 12以降のdevice-to-device transfer差異に備え、`dataExtractionRules` でもcloud backupとdevice transferから資格情報を除外する。`sharedpref`ドメインを除外しているため、永続化したconnection portを保持する`SharedPreferences`ファイルも同様に対象外になる（3.5参照）。
+- ADB資格情報、永続化したconnection port、pairing codeをbackup対象にしない。pairing portとpairing codeはそもそも永続化しないため、backup除外の対象にすらならない。
+- 「ADB資格情報を削除」でKeystore aliasと暗号化秘密鍵ファイル、永続化したconnection portを削除し、libadbのTLS状態を避けるためプロセス再起動後の再pairingを案内する。
 - アプリアンインストール後は再pairingが必要であることを正常動作とする。
 
 ## 6. Android権限
@@ -391,6 +403,7 @@ timeout時はstream/socketをcloseし、同じ処理を自動で無限retryし�
 - output parser: `null`、`0`、`1`、未知文字列、CRLF、空、複数行、過大出力。
 - write read-back: success、not set、unexpected、timeout、disconnect、mismatch。
 - public APIからhost/command文字列を渡せないこと。
+- connection portの永続化: 接続成功時のみ保存、失敗時は保存されない、リセットで削除される、復元時の不正値は空文字として扱われる（fake `ConnectionPreferences`で検証）。
 
 ### APK/manifest test
 
