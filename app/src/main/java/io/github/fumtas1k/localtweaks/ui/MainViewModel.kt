@@ -8,6 +8,7 @@ import io.github.fumtas1k.localtweaks.feature.shutter.ForcedSettingValue
 import io.github.fumtas1k.localtweaks.feature.shutter.ShutterReadError
 import io.github.fumtas1k.localtweaks.feature.shutter.ShutterReadResult
 import io.github.fumtas1k.localtweaks.feature.shutter.ShutterRepository
+import io.github.fumtas1k.localtweaks.feature.shutter.ShutterWriteResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +27,19 @@ internal enum class MainStatus {
     Reading,
     ReadComplete,
     InvalidOutput,
+    ReadTimeout,
     ReadTransportFailed,
+    SettingZero,
+    SettingOne,
+    SetZeroSuccess,
+    SetOneSuccess,
+    WriteReadBackMismatch,
+    WriteInvalidOutput,
+    WriteTimeout,
+    WriteTransportFailed,
+    CredentialResetting,
+    CredentialResetRestartRequired,
+    CredentialResetFailed,
 }
 
 internal data class MainUiState(
@@ -100,11 +113,78 @@ internal class MainViewModel(private val session: LocalAdbSession) : ViewModel()
                     currentValue = null,
                     status = when (result.error) {
                         ShutterReadError.InvalidOutput -> MainStatus.InvalidOutput
+                        ShutterReadError.Timeout -> MainStatus.ReadTimeout
                         ShutterReadError.TransportFailure -> MainStatus.ReadTransportFailed
                     },
                     busy = false,
                 )
             }
+        }
+    }
+
+    fun setZero() {
+        if (mutableState.value.busy) return
+        mutableState.value = mutableState.value.copy(status = MainStatus.SettingZero, busy = true)
+        repository.setZero { result -> applyWriteResult(result, MainStatus.SetZeroSuccess) }
+    }
+
+    fun setOne() {
+        if (mutableState.value.busy) return
+        mutableState.value = mutableState.value.copy(status = MainStatus.SettingOne, busy = true)
+        repository.setOne { result -> applyWriteResult(result, MainStatus.SetOneSuccess) }
+    }
+
+    fun resetCredentials() {
+        if (mutableState.value.busy) return
+        mutableState.value = mutableState.value.copy(status = MainStatus.CredentialResetting, busy = true)
+        repository.resetCredentials { result ->
+            mutableState.value = mutableState.value.copy(
+                status = if (result.isSuccess) {
+                    MainStatus.CredentialResetRestartRequired
+                } else {
+                    MainStatus.CredentialResetFailed
+                },
+                currentValue = null,
+                busy = false,
+            )
+        }
+    }
+
+    private fun applyWriteResult(
+        result: ShutterWriteResult,
+        successStatus: MainStatus,
+    ) {
+        mutableState.value = when (result) {
+            is ShutterWriteResult.Success ->
+                mutableState.value.copy(
+                    currentValue = result.value,
+                    status = successStatus,
+                    busy = false,
+                )
+            is ShutterWriteResult.ReadBackMismatch ->
+                mutableState.value.copy(
+                    currentValue = result.actual,
+                    status = MainStatus.WriteReadBackMismatch,
+                    busy = false,
+                )
+            ShutterWriteResult.InvalidOutput ->
+                mutableState.value.copy(
+                    currentValue = null,
+                    status = MainStatus.WriteInvalidOutput,
+                    busy = false,
+                )
+            ShutterWriteResult.Timeout ->
+                mutableState.value.copy(
+                    currentValue = null,
+                    status = MainStatus.WriteTimeout,
+                    busy = false,
+                )
+            ShutterWriteResult.TransportFailure ->
+                mutableState.value.copy(
+                    currentValue = null,
+                    status = MainStatus.WriteTransportFailed,
+                    busy = false,
+                )
         }
     }
 

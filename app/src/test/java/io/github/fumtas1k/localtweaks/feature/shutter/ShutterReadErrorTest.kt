@@ -16,4 +16,11 @@ class ShutterReadErrorTest {
     @Test fun connectionFailureIsTransportFailure() {
         assertEquals(ShutterReadError.TransportFailure, mapReadFailure(IOException("connection failed")))
     }
+
+    @Test fun timeoutIsDistinctFromTransportFailure() {
+        assertEquals(
+            ShutterReadError.Timeout,
+            mapReadFailure(LocalAdbSession.AdbTimeoutException()),
+        )
+    }
 }

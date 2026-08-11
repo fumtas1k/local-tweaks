@@ -67,7 +67,32 @@ internal class LocalAdbManager(private val context: Context) : AbsAdbConnectionM
         super.openStream(FORCED_SHUTTER_READ_COMMAND)
     }
 
+    fun openForcedShutterSetZeroStream(): AdbStream = synchronized(sessionLock) {
+        checkNotRestarted()
+        super.openStream(FORCED_SHUTTER_SET_ZERO_COMMAND)
+    }
+
+    fun openForcedShutterSetOneStream(): AdbStream = synchronized(sessionLock) {
+        checkNotRestarted()
+        super.openStream(FORCED_SHUTTER_SET_ONE_COMMAND)
+    }
+
     override fun disconnect() = synchronized(sessionLock) { super.disconnect() }
+
+    /** Deletes only this app's ADB identity; a process restart is required afterward. */
+    fun resetCredentials() = synchronized(sessionLock) {
+        runCatching { super.disconnect() }
+        synchronized(credentialLock) {
+            credentials = null
+            credentialResetPending = false
+            try {
+                deleteStoredCredentials()
+            } finally {
+                // libadb can retain TLS identity state for this process.
+                processRestartRequired = true
+            }
+        }
+    }
 
     fun consumeCredentialResetNotice(): Boolean = synchronized(credentialLock) {
         val reset = credentialResetPending
@@ -273,6 +298,10 @@ internal class LocalAdbManager(private val context: Context) : AbsAdbConnectionM
         const val LOOPBACK_HOST = "127.0.0.1"
         const val FORCED_SHUTTER_READ_COMMAND =
             "shell:settings get system csc_pref_camera_forced_shuttersound_key"
+        const val FORCED_SHUTTER_SET_ZERO_COMMAND =
+            "shell:settings put system csc_pref_camera_forced_shuttersound_key 0"
+        const val FORCED_SHUTTER_SET_ONE_COMMAND =
+            "shell:settings put system csc_pref_camera_forced_shuttersound_key 1"
         const val MAX_KEY_BLOB_SIZE = 16 * 1024
         const val MAX_FILE_SIZE = MAX_KEY_BLOB_SIZE + 128
         const val MAX_CERTIFICATE_SIZE = 32 * 1024L

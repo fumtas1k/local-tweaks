@@ -24,7 +24,26 @@
     <string name="reading_progress">Reading…</string>
     <string name="read_complete">Read complete</string>
     <string name="invalid_output">Invalid setting output</string>
+    <string name="read_timeout">Reading the setting timed out</string>
     <string name="read_transport_failed">Unable to read from Local ADB</string>
     <string name="read_current_setting">Read current setting</string>
     <string name="value_not_set">Not set</string>
+    <string name="set_zero">Set forced shutter sound setting to 0</string>
+    <string name="set_one">Set forced shutter sound setting to 1</string>
+    <string name="set_zero_progress">Setting forced shutter sound setting to 0…</string>
+    <string name="set_one_progress">Setting forced shutter sound setting to 1…</string>
+    <string name="set_zero_success">Setting updated to 0 (verified)</string>
+    <string name="set_one_success">Setting updated to 1 (verified)</string>
+    <string name="write_read_back_mismatch">Write read-back mismatch; setting was not verified</string>
+    <string name="write_invalid_output">Invalid write/read-back output</string>
+    <string name="write_timeout">Writing or verifying the setting timed out</string>
+    <string name="write_transport_failed">Write/read transport failed</string>
+    <string name="reset_credentials">Reset ADB credentials</string>
+    <string name="reset_credentials_title">Reset ADB credentials?</string>
+    <string name="reset_credentials_message">This deletes only this app’s ADB identity. Restart the app, then pair with Wireless debugging again.</string>
+    <string name="reset_credentials_confirm">Reset credentials</string>
+    <string name="cancel">Cancel</string>
+    <string name="reset_credentials_progress">Resetting ADB credentials…</string>
+    <string name="reset_credentials_success">Credentials reset. Restart the app, then pair again.</string>
+    <string name="reset_credentials_failed">Could not reset ADB credentials</string>
 </resources>

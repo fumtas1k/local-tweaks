@@ -11,7 +11,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
-/** Process-scoped, serialized ADB pairing, connection, and fixed read session. */
+/** Process-scoped, serialized ADB pairing, connection, and fixed settings session. */
 internal class LocalAdbSession private constructor(context: Context) {
     private val applicationContext = context.applicationContext
     private val executor = Executors.newSingleThreadExecutor()
@@ -44,8 +44,30 @@ internal class LocalAdbSession private constructor(context: Context) {
     }
 
     fun read(onComplete: (Result<String>) -> Unit) {
+        submit(onComplete) { readCurrentRaw() }
+    }
+
+    /** Drains PUT, then performs GET on this same serialized manager/session. */
+    fun setZero(onComplete: (Result<String>) -> Unit) {
         submit(onComplete) {
-            manager.openForcedShutterReadStream().use { readLimited(it) }
+            manager.openForcedShutterSetZeroStream().use { readLimited(it) }
+            readCurrentRaw()
+        }
+    }
+
+    /** Drains PUT, then performs GET on this same serialized manager/session. */
+    fun setOne(onComplete: (Result<String>) -> Unit) {
+        submit(onComplete) {
+            manager.openForcedShutterSetOneStream().use { readLimited(it) }
+            readCurrentRaw()
+        }
+    }
+
+    fun resetCredentials(onComplete: (Result<Unit>) -> Unit) {
+        submit(onComplete) {
+            manager.resetCredentials()
+            connectedPort = null
+            Unit
         }
     }
 
@@ -64,6 +86,9 @@ internal class LocalAdbSession private constructor(context: Context) {
         }
     }
 
+    private fun readCurrentRaw(): String =
+        manager.openForcedShutterReadStream().use { readLimited(it) }
+
     private fun readLimited(stream: AdbStream): String {
         val output = ByteArrayOutputStream()
         val buffer = ByteArray(64)
@@ -73,12 +98,12 @@ internal class LocalAdbSession private constructor(context: Context) {
             stream.openInputStream().use { input ->
                 while (output.size() <= MAX_OUTPUT_BYTES) {
                     val remainingNanos = deadline - System.nanoTime()
-                    if (remainingNanos <= 0) throw ReadTimeoutException()
+                    if (remainingNanos <= 0) throw AdbTimeoutException()
                     val requested = minOf(buffer.size, MAX_OUTPUT_BYTES + 1 - output.size())
                     val read = try {
                         readWithTimeout(stream, input, buffer, requested, remainingNanos)
                     } catch (exception: IOException) {
-                        if (exception is ReadTimeoutException || !stream.isClosed) throw exception
+                        if (exception is AdbTimeoutException || !stream.isClosed) throw exception
                         break
                     }
                     if (read < 0) break
@@ -110,7 +135,7 @@ internal class LocalAdbSession private constructor(context: Context) {
         } catch (exception: TimeoutException) {
             runCatching { stream.close() }
             read.cancel(true)
-            throw ReadTimeoutException(exception)
+            throw AdbTimeoutException(exception)
         } catch (exception: InterruptedException) {
             read.cancel(true)
             Thread.currentThread().interrupt()
@@ -120,7 +145,10 @@ internal class LocalAdbSession private constructor(context: Context) {
         }
     }
 
-    private class ReadTimeoutException(cause: Throwable? = null) : IOException("ADB stream read timed out", cause)
+    internal class AdbTimeoutException(cause: Throwable? = null) : IOException(
+        "ADB stream read timed out",
+        cause,
+    )
     internal class ProtocolException(message: String) : IOException(message)
 
     companion object {

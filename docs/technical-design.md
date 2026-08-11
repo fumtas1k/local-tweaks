@@ -466,6 +466,8 @@ PoC終了時に、`libadb-android` 継続かAOSP native方式への切替をdeci
 - read-back verificationを追加する。
 - credential reset、re-pairing導線を追加する。
 
+SC-53G実機で完了した。0/1のPUT後に同一Local ADB sessionでGETし、期待値との一致を確認した。資格情報削除後はprocess再起動前のpairingを拒否し、再起動後に新しい6桁コードで再pairing、接続、GETへ成功した。
+
 ### Phase 5: Hardening
 
 - dependency locking/verification。

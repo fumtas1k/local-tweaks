@@ -172,6 +172,26 @@ abstract class VerifyReleaseArtifactTask : DefaultTask() {
         check(sourceViolations.isEmpty()) {
             "Production source contains removed probe markers: ${sourceViolations.joinToString()}"
         }
+        val fixedCommands = setOf(
+            "shell:settings get system csc_pref_camera_forced_shuttersound_key",
+            "shell:settings put system csc_pref_camera_forced_shuttersound_key 0",
+            "shell:settings put system csc_pref_camera_forced_shuttersound_key 1",
+        )
+        val sourceContents = productionSources.files
+            .filter { it.isFile }
+            .map { it.readText() }
+        val missingCommands = fixedCommands.filterNot { command ->
+            sourceContents.any { content -> content.contains(command) }
+        }
+        check(missingCommands.isEmpty()) {
+            "Production source is missing fixed ADB commands: $missingCommands"
+        }
+        val shellCommands = sourceContents.flatMap { content ->
+            Regex("""shell:[^"\r\n]+""").findAll(content).map { it.value }.toList()
+        }.toSet()
+        check(shellCommands == fixedCommands) {
+            "Production source command table is not exactly GET/PUT0/PUT1: $shellCommands"
+        }
         val forbiddenEntries = apks.flatMap { apk ->
             ZipFile(apk).use { zip ->
                 val removedProbeMarkers = listOf(

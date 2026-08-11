@@ -16,10 +16,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +57,7 @@ class MainActivity : ComponentActivity() {
 private fun LocalTweaksScreen(viewModel: MainViewModel, onOpenSettings: () -> Unit) {
     val state by viewModel.state.collectAsState()
     var pairingCode by remember { mutableStateOf("") }
+    var showResetDialog by remember { mutableStateOf(false) }
     val valueText = when (val value = state.currentValue) {
         null -> stringResource(R.string.value_not_read)
         ForcedSettingValue.NotSet -> stringResource(R.string.value_not_set)
@@ -130,8 +133,46 @@ private fun LocalTweaksScreen(viewModel: MainViewModel, onOpenSettings: () -> Un
                     enabled = !state.busy,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.read_current_setting)) }
+
+                Button(
+                    onClick = viewModel::setZero,
+                    enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.set_zero)) }
+                Button(
+                    onClick = viewModel::setOne,
+                    enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.set_one)) }
+
+                Button(
+                    onClick = { showResetDialog = true },
+                    enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.reset_credentials)) }
             }
         }
+    }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text(stringResource(R.string.reset_credentials_title)) },
+            text = { Text(stringResource(R.string.reset_credentials_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showResetDialog = false
+                        viewModel.resetCredentials()
+                    },
+                ) { Text(stringResource(R.string.reset_credentials_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
     }
 }
 
@@ -150,5 +191,17 @@ private fun statusText(status: MainStatus): String = when (status) {
     MainStatus.Reading -> stringResource(R.string.reading_progress)
     MainStatus.ReadComplete -> stringResource(R.string.read_complete)
     MainStatus.InvalidOutput -> stringResource(R.string.invalid_output)
+    MainStatus.ReadTimeout -> stringResource(R.string.read_timeout)
     MainStatus.ReadTransportFailed -> stringResource(R.string.read_transport_failed)
+    MainStatus.SettingZero -> stringResource(R.string.set_zero_progress)
+    MainStatus.SettingOne -> stringResource(R.string.set_one_progress)
+    MainStatus.SetZeroSuccess -> stringResource(R.string.set_zero_success)
+    MainStatus.SetOneSuccess -> stringResource(R.string.set_one_success)
+    MainStatus.WriteReadBackMismatch -> stringResource(R.string.write_read_back_mismatch)
+    MainStatus.WriteInvalidOutput -> stringResource(R.string.write_invalid_output)
+    MainStatus.WriteTimeout -> stringResource(R.string.write_timeout)
+    MainStatus.WriteTransportFailed -> stringResource(R.string.write_transport_failed)
+    MainStatus.CredentialResetting -> stringResource(R.string.reset_credentials_progress)
+    MainStatus.CredentialResetRestartRequired -> stringResource(R.string.reset_credentials_success)
+    MainStatus.CredentialResetFailed -> stringResource(R.string.reset_credentials_failed)
 }

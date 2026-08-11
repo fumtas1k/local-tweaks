@@ -137,3 +137,25 @@ Phase 1の`WRITE_SETTINGS`、Phase 2の固定`echo hello`、debug probe Activity
 ## Phase 3判定
 
 固定GETの値を型付きで読み取り、SC-53GのCompose UIへraw値を表示する成功条件を満たした。次はPhase 4で、固定した0/1へのPUTと同一接続上のGETによるread-back verificationを追加する。
+
+## Phase 4: write MVP
+
+Phase 3版へ固定PUT 0/1とread-back verificationを追加し、同じ保存済み資格情報を保持したままSC-53Gで検証した。UI、ViewModel、feature repositoryはcommand文字列を扱わず、0と1への型付き操作だけを公開する。
+
+| 操作 | 結果 |
+|---|---|
+| 現在値GET | `0` |
+| 固定PUT 1後の同一session GET | `1`、UIでverified success |
+| 固定PUT 0後の同一session GET | `0`、UIでverified success |
+| Mac公式ADBによる最終値確認 | `0` |
+| 資格情報リセット確認ダイアログ | 表示とキャンセルに成功 |
+| 資格情報削除 | アプリ管理のADB identityだけを削除し、再起動案内を表示 |
+| process再起動前の再pairing | 失敗（想定どおり） |
+| process再起動後の再pairing | 成功 |
+| 再pairing後の接続と固定GET | 成功、`0` |
+
+書き込み結果はPUT streamの完了だけで判断せず、直後のGETが期待するraw値と一致した場合だけ成功とした。timeout、不正出力、transport失敗、read-back mismatchは別の型とUI状態で扱う。
+
+## Phase 4判定
+
+固定した3コマンドだけで読み取り、0/1への変更、read-back verificationが成立した。資格情報リセットと再pairing導線も実機で確認した。最終値は`0`へ戻した。次はPhase 5のhardeningと実機test matrixへ進む。
