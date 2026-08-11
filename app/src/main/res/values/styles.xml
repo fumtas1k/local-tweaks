@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!--
+        System bar colours are deliberately absent. targetSdk is 36, and from API 35
+        android:statusBarColor / android:navigationBarColor are deprecated no-ops and
+        edge-to-edge is enforced. MainActivity calls enableEdgeToEdge() so the bar icon
+        appearance follows light/dark explicitly instead of relying on that enforcement.
+        The night variant of this file only swaps the parent so the window background
+        does not flash light before Compose draws in dark mode.
+    -->
     <style name="Theme.LocalTweaks" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:colorAccent">#2457A7</item>
-        <item name="android:navigationBarColor">#FFFFFF</item>
-        <item name="android:statusBarColor">#FFFFFF</item>
-        <item name="android:windowLightNavigationBar">true</item>
-        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>

@@ -7,6 +7,7 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -84,6 +85,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var viewModel: MainViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Declares edge-to-edge explicitly rather than relying on the targetSdk 35+
+        // enforcement, so system bar icon appearance tracks light/dark from one place.
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         session = LocalAdbSession.getInstance(applicationContext)
         val connectionPreferences = SharedPreferencesConnectionPreferences(applicationContext)

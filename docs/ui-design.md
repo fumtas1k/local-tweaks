@@ -89,6 +89,8 @@
 
 Top App BarとScaffoldのcontent paddingでsystem barを避ける。本文は16dpを基本余白とし、狭い画面では縦スクロール可能にする。
 
+`MainActivity`は`enableEdgeToEdge()`を呼び、system barのアイコンの明暗をlight/darkに追従させる。targetSdkが35以上のため`android:statusBarColor`と`android:navigationBarColor`は非推奨のno-opであり、`styles.xml`でsystem barの色を指定しない。window背景がCompose描画前に明るく光らないよう、`values-night/styles.xml`でparentだけdarkに差し替える。
+
 本文は`HorizontalDivider`の羅列で区切らず、セクション単位の`Card`（`surfaceContainer`）にまとめる。セクションは「見出し（`titleMedium`）→ 本文 → 操作」の順で構成し、セクション間は16dp、セクション内の要素間は8dpとする。`HorizontalDivider`は同一カード内の並列項目を分けるときにだけ使う。
 
 ## ホーム
