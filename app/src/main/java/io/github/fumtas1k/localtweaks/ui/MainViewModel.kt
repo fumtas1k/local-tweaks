@@ -2,6 +2,7 @@ package io.github.fumtas1k.localtweaks.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import io.github.fumtas1k.localtweaks.R
 import io.github.fumtas1k.localtweaks.adb.AdbInputValidator
 import io.github.fumtas1k.localtweaks.adb.AdbRestartRequiredException
 import io.github.fumtas1k.localtweaks.adb.ConnectionPreferences
@@ -91,6 +92,26 @@ internal enum class MainStatusTone {
     Success,
     Failure,
     Warning,
+}
+
+internal data class ConnectionStatusPresentation(
+    val tone: MainStatusTone,
+    val messageRes: Int,
+)
+
+internal fun connectionStatusPresentation(state: MainUiState): ConnectionStatusPresentation = when {
+    state.restartRequired -> ConnectionStatusPresentation(
+        tone = MainStatusTone.Warning,
+        messageRes = R.string.restart_required,
+    )
+    state.connected -> ConnectionStatusPresentation(
+        tone = MainStatusTone.Success,
+        messageRes = R.string.connection_success,
+    )
+    else -> ConnectionStatusPresentation(
+        tone = MainStatusTone.Neutral,
+        messageRes = R.string.status_not_connected,
+    )
 }
 
 internal fun mainStatusTone(status: MainStatus): MainStatusTone = when (status) {
