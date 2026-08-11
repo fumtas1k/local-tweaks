@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="probe_app_name">Local Tweaks Probe</string>
+    <string name="probe_title">Settings.System debug probe</string>
+    <string name="probe_warning">検証専用です。WRITE_SETTINGSは広いspecial accessです。検証後に許可を解除してください。</string>
+    <string name="permission_granted">設定変更の許可: あり</string>
+    <string name="permission_denied">設定変更の許可: なし</string>
+    <string name="current_value">現在のraw値: %1$s</string>
+    <string name="open_permission">設定変更の許可を開く</string>
+    <string name="refresh">再読取</string>
+    <string name="set_zero">0に設定</string>
+    <string name="set_one">1に設定</string>
+    <string name="status_idle">結果: 未実行</string>
+    <string name="status_refreshed">結果: 再読取しました</string>
+    <string name="status_permission_required">結果: 先に設定変更を許可してください</string>
+    <string name="status_write_success">結果: %1$dへの変更成功（read-back: %2$s）</string>
+    <string name="status_write_rejected">結果: putIntがfalseを返しました（read-back: %1$s）</string>
+    <string name="status_read_back_mismatch">結果: read-back不一致（期待値: %1$d、実値: %2$s）</string>
+    <string name="status_security_error">結果: SecurityException（%1$s）</string>
+    <string name="status_illegal_argument">結果: 通常Android APIでは変更不可（%1$s）</string>
+    <string name="status_open_settings_error">結果: 許可画面を開けませんでした</string>
+</resources>

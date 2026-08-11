@@ -329,9 +329,15 @@ Android 17対応時は、loopback接続がLocal Network permissionなしで引�
 判定:
 
 - 読み書きとread-backが実機で成功する場合: Local ADBを廃止できるか、権限の広さと鍵管理不要という利点を比較して再決定する。
-- `SecurityException`、false return、read-back mismatchの場合: Local ADB PoCへ進む。
+- `SecurityException`、`IllegalArgumentException`、false return、read-back mismatchの場合: Local ADB PoCへ進む。
 
 `WRITE_SETTINGS` は永続的なspecial accessで広い設定変更能力を与えるため、常にLocal ADBより「狭い」とは仮定しない。
+
+### 7.1 実機判定（2026-08-11）
+
+SC-53G、Android 16、One UI 8.5、CSC DCM、build `BP4A.251205.006.SC53GOMS1AZF2`で検証した。special access付与後、GETは成功したが、`Settings.System.putInt`は`IllegalArgumentException`（`You cannot keep your settings in the secure settings.`）で拒否された。値は変更されなかった。
+
+通常Android API方式は不採用とし、Phase 2のLocal ADB PoCへ進む。詳細は[`device-validation.md`](device-validation.md)を参照する。
 
 ## 8. エラーとtimeout
 

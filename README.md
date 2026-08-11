@@ -2,7 +2,7 @@
 
 Galaxy S26 Ultra自身からLocal ADBへ接続し、Samsung固有のカメラシャッター音強制設定を確認・変更するための、自己管理・自己署名を前提としたAndroidアプリです。
 
-現在は設計段階であり、Androidプロジェクトや動作するAPKはまだありません。
+現在はPhase 2の準備段階です。Macからの実機確認は成功しましたが、通常の`Settings.System` APIによる変更はSamsung側に拒否されました。次はLocal ADBのpairingと固定`echo hello`を検証します。Local ADBを使うMVPはまだありません。
 
 ## 対象操作
 
@@ -30,22 +30,23 @@ settings put system csc_pref_camera_forced_shuttersound_key 1
 
 - [要件定義](docs/requirements.md)
 - [技術設計案](docs/technical-design.md)
+- [実機検証記録](docs/device-validation.md)
 - [Contributor Guide](AGENTS.md)
 
 要件と設計が食い違う場合は、まず文書を更新して判断を明文化してから実装します。
 
 ## 開発状況
 
-予定している実装順序は次のとおりです。
+実装順序は次のとおりです。
 
-1. Galaxy S26 Ultra実機で対象settingのGET・PUT・read-backを確認する。
-2. debug variantで通常の`Settings.System` APIを検証する。
-3. Local ADBのpairing、接続、debug限定の固定`echo hello`をPoCする。
+1. ✅ Galaxy S26 Ultra実機で対象settingのGET・PUT・read-backを確認する。
+2. ✅ debug variantで通常の`Settings.System` APIを検証し、変更不可を確認する。
+3. ⏳ Local ADBのpairing、接続、debug限定の固定`echo hello`をPoCする。
 4. read-only MVPを実装する。
 5. 0/1への変更とread-back verificationを追加する。
 6. dependency verification、manifest検査、backup除外を行う。
 
-Gradle Wrapper追加後は、次のコマンドを使用する予定です。
+次のコマンドを使用します。
 
 ```shell
 ./gradlew assembleDebug
@@ -53,6 +54,16 @@ Gradle Wrapper追加後は、次のコマンドを使用する予定です。
 ./gradlew lint
 ./gradlew connectedAndroidTest
 ```
+
+### Phase 1 probe（検証完了）
+
+probeはdebug buildだけに存在し、広いspecial accessである`WRITE_SETTINGS`を一時的に要求します。release buildにはこの権限と画面を含めません。
+
+```shell
+./gradlew installDebug
+```
+
+SC-53Gではspecial access付与後も`Settings.System.putInt`が`IllegalArgumentException`で拒否されました。再確認する場合、端末で「Local Tweaks Probe」を開き、「設定変更の許可を開く」からspecial accessを付与します。検証後はspecial accessを解除してください。
 
 ## 開発に参加する場合
 

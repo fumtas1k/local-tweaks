@@ -2,15 +2,14 @@
 
 ## プロジェクト構成
 
-このリポジトリは現在、設計段階にある。プロダクト要件とセキュリティ要件は`docs/requirements.md`、実装方式の判断は`docs/technical-design.md`を正とする。
+このリポジトリは現在、Local ADB PoCを行うPhase 2にある。プロダクト要件とセキュリティ要件は`docs/requirements.md`、実装方式の判断は`docs/technical-design.md`、実機結果は`docs/device-validation.md`を正とする。
 
-Androidモジュールは`app/`に配置する予定。Kotlinコードは`app/src/main/java/`以下で責務別に分け、Local ADB基盤を`adb/`、ドメインとRepositoryを`feature/shutter/`、Jetpack Compose画面を`ui/`へ置く。リソースは`app/src/main/res/`、Unit Testは`app/src/test/`、Instrumented Testは`app/src/androidTest/`に配置する。
+Androidモジュールは`app/`に置く。Phase 1の一時的なprobeは`app/src/debug/`だけに配置する。製品用Kotlinコードは`app/src/main/java/`以下で責務別に分け、Local ADB基盤を`adb/`、ドメインとRepositoryを`feature/shutter/`、Jetpack Compose画面を`ui/`へ置く。リソースは`app/src/main/res/`、Unit Testは`app/src/test/`、Instrumented Testは`app/src/androidTest/`に配置する。
 
 ## ビルド・テスト・開発コマンド
 
-AndroidプロジェクトとGradle Wrapperは未作成である。追加後は次を使用する。
-
 - `./gradlew assembleDebug` — debug APKをビルドする。
+- `./gradlew installDebug` — 接続端末へPhase 1 probeをインストールする。
 - `./gradlew test` — JVM上のUnit Testを実行する。
 - `./gradlew connectedAndroidTest` — 接続端末でInstrumented Testを実行する。
 - `./gradlew lint` — Androidの静的解析を実行する。
@@ -27,7 +26,7 @@ Kotlinは4スペースでインデントする。型とCompose関数は`UpperCam
 
 ## セキュリティと設定
 
-releaseコードで許可するのは、要件に定義された3つの固定settings操作だけとする。任意shell入力、Shizuku、mDNS/LAN探索、Analytics、外部API通信を追加しない。ADB hostはnumeric loopback `127.0.0.1`に固定する。ペアリングコード、秘密鍵、署名素材、認証情報をログ出力またはコミットしない。
+releaseコードで許可するのは、要件に定義された3つの固定settings操作だけとする。Phase 1の`WRITE_SETTINGS`とprobe Activityはdebug source setから外へ出さない。任意shell入力、Shizuku、mDNS/LAN探索、Analytics、外部API通信を追加しない。ADB hostはnumeric loopback `127.0.0.1`に固定する。ペアリングコード、秘密鍵、署名素材、認証情報をログ出力またはコミットしない。
 
 ## コミットとPull Request
 
