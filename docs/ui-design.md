@@ -24,11 +24,15 @@
 | --- | --- |
 | 画面背景 | `background` |
 | セクションカード | `surfaceContainerHigh` |
-| 無効なカード | `surfaceContainerLow` + `onSurfaceVariant`の文字 |
+| 無効なカード | `surfaceContainer` + `onSurfaceVariant`の文字 |
 | 成功状態 | `primary` |
 | 失敗・入力エラー | `error` |
-| 要再起動の警告 | `errorContainer` / `onErrorContainer` |
+| 要再起動の警告・危険操作カード | `errorContainer` / `onErrorContainer` |
 | 補助説明 | `onSurfaceVariant` |
+
+カードの階調は「画面背景 < 無効なカード < セクションカード」の順とし、light/darkの両方でこの順序が崩れないこと。無効なカードは有効なカードより沈ませるが、**背景と同色にはしない**。dynamic colorのpaletteによっては`surfaceContainerLow`が`background`と同値になり、カードの境界が消えて「ただの文字」に見える。
+
+`errorContainer`を背景に使う面では、前景に`error`を直接指定しない。paletteが保証するのはcontainerとon-containerの対応であり、`error`を上書きするとその保証を外れる。面の文字は`onErrorContainer`とし、`error`は危険操作のボタン自身の強調にだけ使う。
 
 ボタンは強調度の三段階（主要・補助・危険）を種別で区別し、色の上書きで表現しない。3種とも「押せる要素」と分かる見た目（塗り、薄い塗り、枠線のいずれか）を保つこと。文字だけのボタン（`TextButton`）は、ページ内リンクのようなナビゲーション操作（例: ホームの「接続する」）にだけ使い、実際の操作を伴う主要・補助・危険操作には使わない。
 
@@ -36,7 +40,7 @@
 | --- | --- | --- |
 | 主要操作 | `Button` | 既定（`primary` / `onPrimary`の塗り） |
 | 補助操作 | `FilledTonalButton` | 既定（`secondaryContainer` / `onSecondaryContainer`の薄い塗り、色の上書き不要） |
-| 危険操作 | `OutlinedButton` | `error`色の枠線と文字。塗りにはしない（主要操作と同じ重みになり、破壊的操作を誘うため） |
+| 危険操作 | `OutlinedButton` | `error`色の枠線と文字。塗りにはしない（主要操作と同じ重みになり、破壊的操作を誘うため）。ボタンを載せるカード面は`errorContainer` / `onErrorContainer`のままとし、`error`はボタンだけに使う |
 
 主要操作・補助操作は色を上書きしないため、`enabled = false`時も`ButtonDefaults`の既定disabled配色がそのまま効く。危険操作は`contentColor`と`border`を`error`色に上書きしているため、`disabledContentColor`と、無効時の`border`色（`error.copy(alpha = 0.38f)`など）も必ず明示すること。`Card`や`TextButton`で`containerColor`/`contentColor`だけを渡して`disabled*`を渡し忘れた過去の不具合と同じ性質なので、色を上書きするボタンでは常に無効時の見た目を確認する。
 
