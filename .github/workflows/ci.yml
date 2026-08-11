@@ -19,11 +19,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Matches the local build environment (java -version reports Temurin 23).
       - name: Set up JDK 23 (Temurin)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "23"
@@ -35,15 +35,19 @@ jobs:
       # platform/build-tools package is left to AGP's SDK auto-download
       # during the Gradle run below.
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       # `yes |` can make sdkmanager exit non-zero once it stops reading
       # stdin after the last prompt; that's not a real failure here.
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses > /dev/null || true
 
+      # Pinned to v5 on purpose. v6 moved the caching implementation into
+      # `gradle-actions-caching`, a proprietary component whose use requires
+      # accepting https://gradle.com/legal/terms-of-use/. v5 is still MIT and
+      # already runs on Node 24, which is all the deprecation warning asked for.
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       # Runs unit tests, lint, and this repo's release-artifact/manifest/
       # runtime-classpath verification tasks (wired into the `check`
