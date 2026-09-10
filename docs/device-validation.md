@@ -182,7 +182,7 @@ Phase 4の実機操作で、資格情報削除後も再起動前にPairを押せ
 
 現行の対象端末とbuildについてMVPのDefinition of Doneを満たした。dependencyまたはpermissionを変更する場合は、strict lock、SHA-256 verification、merged manifest、release artifactの検査を再実行する。
 
-## OSアップデート後のペアリング消失（2026-09-10、ユーザー報告）
+## OSアップデート後の接続失敗と再ペアリング（2026-09-10〜11）
 
 ユーザー報告によると、SC-53GのOSアップデート後に次の事象があった。
 
@@ -190,6 +190,24 @@ Phase 4の実機操作で、資格情報削除後も再起動前にPairを押せ
 - Wireless Debuggingの「ペア設定済みのデバイス」一覧が空になっていた（スクリーンショットで確認）。
 - 端末側の接続用ポート表示と一致するポートをアプリへ入力しても、アプリは「接続に失敗しました」とだけ表示した。
 
-アップデート後のbuild番号、失敗時にアプリ内部を通った例外経路（`ConnectFailure`のどの分類に該当したか）、再ペアリングで復旧したかどうかは、いずれも未記録・未検証である。原因は「ペアリング情報が端末側から失われた状態でのconnect試行」と推測されるが、これは推測であり、本記録は事実として確認できた3点（上記の箇条書き）とユーザー報告の範囲に限定する。
+ユーザー報告によると、その後アプリで再ペアリングすると接続でき、強制シャッター音設定を`0`へ戻せた。
+
+### 2026-09-11の追加確認
+
+アップデート後のbuildは`BP4A.251205.006.SC53GOMS1AZHL`（Android 16、CSC DCM）。修正版debug APKを上書きし、USB ADBとLocal ADBで次を確認した。
+
+| 確認項目 | 結果 |
+|---|---|
+| 強制シャッター音設定のGET | `0` |
+| 「ペア設定済みのデバイス」一覧 | 空のまま |
+| 正しい接続ポートでの接続（再ペアリングなし） | 成功。adbdログは`Handshake succeeded` |
+| 古い接続ポートでの接続 | `ConnectionPortUnavailable`の文言を表示し、ペアリングセクションは閉じたまま |
+| 接続中にWireless DebuggingをOFF/ONし、同一processで新ポートへ接続 | 成功 |
+| MacのUSB ADB | アップデート後は`unauthorized`となり、再許可が必要だった |
+| Auto Blocker | 手動OFF後に自動でONへ戻り、`ADB is blocked by Auto Blocker`でUSBとWireless Debuggingの両方が無効化された |
+
+「ペア設定済みのデバイス」一覧が空でも、アプリの鍵は信頼されていた。一覧の表示はペアリング状態の判断に使えない。
+
+失敗時は再ペアリングで復旧したため、ペアリングが無効になっていたと判断する。無効化の原因がOSアップデートか、ADB認証の自動失効（`adb_allowed_connection_time`は未設定で既定値）かは未確認である。失敗時のlogcatは残っておらず、未ペアリング時に`PairingRequired`と`Other`のどちらに分類されるかも未検証である。
 
 この事象を受け、接続失敗を`RestartRequired` / `PairingRequired` / `PortUnavailable` / `Other`に分類し、`PairingRequired`および汎用失敗の`Other`（`ConnectionFailed`）ではペアリングセクションを自動展開するようアプリを修正した（`docs/technical-design.md` 3.3、`docs/ui-design.md` の「状態表示」「接続設定」参照）。次回同様の事象が発生した場合は、build番号とアプリの表示状態（`MainStatus`）を記録し、この節を更新する。
