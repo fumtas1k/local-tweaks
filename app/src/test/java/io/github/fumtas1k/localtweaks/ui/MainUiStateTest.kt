@@ -1,6 +1,7 @@
 package io.github.fumtas1k.localtweaks.ui
 
 import io.github.fumtas1k.localtweaks.R
+import io.github.fumtas1k.localtweaks.adb.ConnectFailure
 import io.github.fumtas1k.localtweaks.feature.shutter.ForcedSettingValue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -158,6 +159,8 @@ class MainUiStateTest {
             MainStatus.PairingFailed,
             MainStatus.InvalidConnectionPort,
             MainStatus.ConnectionFailed,
+            MainStatus.ConnectionPairingRequired,
+            MainStatus.ConnectionPortUnavailable,
             MainStatus.InvalidOutput,
             MainStatus.ReadTimeout,
             MainStatus.ReadTransportFailed,
@@ -186,5 +189,58 @@ class MainUiStateTest {
 
         assertEquals(MainStatusTone.Success, presentation.tone)
         assertEquals(R.string.connection_success, presentation.messageRes)
+    }
+
+    @Test fun restartRequiredConnectFailureForcesRestartAndConnectionSettings() {
+        val state = MainUiState(
+            connected = true,
+            busy = true,
+            screen = MainScreen.CameraSettings,
+        ).applyConnectFailure(ConnectFailure.RestartRequired)
+
+        assertEquals(MainStatus.RestartRequired, state.status)
+        assertFalse(state.busy)
+        assertFalse(state.connected)
+        assertTrue(state.restartRequired)
+        assertEquals(MainScreen.ConnectionSettings, state.screen)
+    }
+
+    @Test fun pairingRequiredConnectFailureClearsConnectedAndBusy() {
+        val state = MainUiState(connected = true, busy = true).applyConnectFailure(ConnectFailure.PairingRequired)
+
+        assertEquals(MainStatus.ConnectionPairingRequired, state.status)
+        assertFalse(state.busy)
+        assertFalse(state.connected)
+        assertFalse(state.restartRequired)
+    }
+
+    @Test fun portUnavailableConnectFailureClearsConnectedAndBusy() {
+        val state = MainUiState(connected = true, busy = true).applyConnectFailure(ConnectFailure.PortUnavailable)
+
+        assertEquals(MainStatus.ConnectionPortUnavailable, state.status)
+        assertFalse(state.busy)
+        assertFalse(state.connected)
+        assertFalse(state.restartRequired)
+    }
+
+    @Test fun otherConnectFailureClearsConnectedAndBusy() {
+        val state = MainUiState(connected = true, busy = true).applyConnectFailure(ConnectFailure.Other)
+
+        assertEquals(MainStatus.ConnectionFailed, state.status)
+        assertFalse(state.busy)
+        assertFalse(state.connected)
+        assertFalse(state.restartRequired)
+    }
+
+    @Test fun pairingRequiredAndGenericFailureExpandPairingSection() {
+        assertTrue(shouldExpandPairingSection(MainStatus.ConnectionPairingRequired))
+        assertTrue(shouldExpandPairingSection(MainStatus.ConnectionFailed))
+    }
+
+    @Test fun portUnavailableAndOtherStatusesDoNotExpandPairingSection() {
+        assertFalse(shouldExpandPairingSection(MainStatus.ConnectionPortUnavailable))
+        assertFalse(shouldExpandPairingSection(MainStatus.NotConnected))
+        assertFalse(shouldExpandPairingSection(MainStatus.Connected))
+        assertFalse(shouldExpandPairingSection(MainStatus.Connecting))
     }
 }

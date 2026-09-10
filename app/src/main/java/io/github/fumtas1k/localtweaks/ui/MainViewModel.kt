@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModelProvider
 import io.github.fumtas1k.localtweaks.R
 import io.github.fumtas1k.localtweaks.adb.AdbInputValidator
 import io.github.fumtas1k.localtweaks.adb.AdbRestartRequiredException
+import io.github.fumtas1k.localtweaks.adb.ConnectFailure
 import io.github.fumtas1k.localtweaks.adb.ConnectionPreferences
 import io.github.fumtas1k.localtweaks.adb.LocalAdbSession
+import io.github.fumtas1k.localtweaks.adb.classifyConnectFailure
 import io.github.fumtas1k.localtweaks.adb.restoreValidatedConnectionPort
 import io.github.fumtas1k.localtweaks.adb.saveConnectionPortIfConnected
 import io.github.fumtas1k.localtweaks.feature.shutter.ForcedSettingValue
@@ -29,6 +31,8 @@ internal enum class MainStatus {
     Connecting,
     Connected,
     ConnectionFailed,
+    ConnectionPairingRequired,
+    ConnectionPortUnavailable,
     Reading,
     ReadComplete,
     InvalidOutput,
@@ -93,6 +97,42 @@ internal fun MainUiState.markRestartRequired(): MainUiState = copy(
     screen = MainScreen.ConnectionSettings,
 )
 
+/** Applies the outcome of a failed [LocalAdbSession.connect] call, classified by [ConnectFailure]. */
+internal fun MainUiState.applyConnectFailure(failure: ConnectFailure): MainUiState = when (failure) {
+    ConnectFailure.RestartRequired -> markRestartRequired().copy(
+        status = MainStatus.RestartRequired,
+        busy = false,
+    )
+    ConnectFailure.PairingRequired -> copy(
+        status = MainStatus.ConnectionPairingRequired,
+        busy = false,
+        connected = false,
+    )
+    ConnectFailure.PortUnavailable -> copy(
+        status = MainStatus.ConnectionPortUnavailable,
+        busy = false,
+        connected = false,
+    )
+    ConnectFailure.Other -> copy(
+        status = MainStatus.ConnectionFailed,
+        busy = false,
+        connected = false,
+    )
+}
+
+/**
+ * Whether the connection settings screen should auto-expand the pairing section for the given
+ * status. [MainStatus.ConnectionFailed] is included because a generic TLS-level failure cannot
+ * be distinguished from an unpaired device (see `classifyConnectFailure`), so this errs toward
+ * showing the re-pairing path. [MainStatus.ConnectionPortUnavailable] is excluded because a
+ * reachable-but-stale port is not a pairing problem, and forcing the section open there would
+ * misdirect the user toward re-pairing instead of correcting the port.
+ */
+internal fun shouldExpandPairingSection(status: MainStatus): Boolean = when (status) {
+    MainStatus.ConnectionPairingRequired, MainStatus.ConnectionFailed -> true
+    else -> false
+}
+
 internal enum class MainStatusTone {
     Neutral,
     Progress,
@@ -141,6 +181,8 @@ internal fun mainStatusTone(status: MainStatus): MainStatusTone = when (status) 
     MainStatus.PairingFailed,
     MainStatus.InvalidConnectionPort,
     MainStatus.ConnectionFailed,
+    MainStatus.ConnectionPairingRequired,
+    MainStatus.ConnectionPortUnavailable,
     MainStatus.InvalidOutput,
     MainStatus.ReadTimeout,
     MainStatus.ReadTransportFailed,
@@ -234,22 +276,12 @@ internal class MainViewModel(
         mutableState.value = current.copy(status = MainStatus.Connecting, busy = true)
         session.connect(port) { result ->
             connectionPreferences.saveConnectionPortIfConnected(result.isSuccess, current.connectionPort)
-            mutableState.value = if (result.exceptionOrNull() is AdbRestartRequiredException) {
-                mutableState.value.markRestartRequired().copy(
-                    status = MainStatus.RestartRequired,
-                    busy = false,
-                )
-            } else {
-                if (result.isSuccess) {
-                    mutableState.value.markConnected()
-                } else {
-                    mutableState.value.copy(
-                        status = MainStatus.ConnectionFailed,
-                        busy = false,
-                        connected = false,
-                    )
-                }
-            }
+            mutableState.value = result.fold(
+                onSuccess = { mutableState.value.markConnected() },
+                onFailure = { exception ->
+                    mutableState.value.applyConnectFailure(classifyConnectFailure(exception))
+                },
+            )
         }
     }
 
