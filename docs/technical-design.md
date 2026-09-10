@@ -184,6 +184,18 @@ ConnectionLost
 
 pairing codeは6桁のASCII数字として検証し、pairing呼び出し後すぐメモリ上の参照を破棄する。Kotlin/JVMではStringの確実なzeroizeはできないため、ログ・saved state・clipboard・永続化へ渡さないことを主な防御とする。
 
+`connect`失敗はライブラリの例外を`adb/ConnectFailure.kt`の`classifyConnectFailure`が型とcause chainだけで分類し、アプリの状態へ落とし込む。対応表は次のとおり（`libadb-android` 3.1.1のバイトコード確認による。実機でどの経路を通るかは一部未検証）。
+
+| `libadb-android` 3.1.1の例外 | `ConnectFailure` | アプリの`MainStatus` |
+| --- | --- | --- |
+| `AdbRestartRequiredException`（本アプリ内部の例外） | `RestartRequired` | `RestartRequired` |
+| `io.github.muntashirakon.adb.AdbPairingRequiredException`（`AdbConnection`接続スレッドの`SSLProtocolException("...protocol error...")`から生成） | `PairingRequired` | `ConnectionPairingRequired` |
+| `io.github.muntashirakon.adb.AdbAuthenticationFailedException` | `PairingRequired` | `ConnectionPairingRequired` |
+| cause chainのどこかに`java.net.ConnectException`を含む`IOException`（`new Socket(host, port)`失敗を`AdbConnection`コンストラクタが包んだもの。ポートに何も待ち受けていない場合） | `PortUnavailable` | `ConnectionPortUnavailable` |
+| 上記以外（causeなしの`IOException("Connection failed")`、`waitForConnection`のtimeout由来など） | `Other` | `ConnectionFailed` |
+
+`AdbPairingRequiredException`は接続スレッドの例外が`SSLProtocolException`かつメッセージに`"protocol error"`を含む場合にだけ生成されるため、未ペアリングの実機挙動がこの経路を通るとは限らず、causeなしの汎用`IOException("Connection failed")`になる可能性がある。この汎用失敗は未ペアリングと区別できないため、`ConnectionFailed`でも再ペアリング導線（ペアリングセクションの自動展開）を出す。`classifyConnectFailure`は例外メッセージを一切参照せず、UI・ログへも例外メッセージを渡さない。
+
 ### 3.4 再接続
 
 ADB認証鍵はペアリング後も有効だが、connection portは変わる可能性がある。

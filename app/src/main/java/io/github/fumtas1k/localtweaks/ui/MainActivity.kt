@@ -445,6 +445,12 @@ private fun ConnectionSettingsScreen(
     // must always be able to open this section regardless of the starting value.
     var pairingSectionExpanded by rememberSaveable { mutableStateOf(pairingSectionDefaultExpanded) }
 
+    // Auto-expand only: a failure that indicates (or may indicate) a re-pairing need opens
+    // the section so the user notices it, but never auto-collapses it.
+    LaunchedEffect(state.status) {
+        if (shouldExpandPairingSection(state.status)) pairingSectionExpanded = true
+    }
+
     ConnectionStatusHeader(status = state.status)
 
     SectionCard {
@@ -688,6 +694,8 @@ private fun statusText(status: MainStatus): String = when (status) {
     MainStatus.Connecting -> stringResource(R.string.connecting_progress)
     MainStatus.Connected -> stringResource(R.string.connection_success)
     MainStatus.ConnectionFailed -> stringResource(R.string.connection_failed)
+    MainStatus.ConnectionPairingRequired -> stringResource(R.string.connection_pairing_required)
+    MainStatus.ConnectionPortUnavailable -> stringResource(R.string.connection_port_unavailable)
     MainStatus.Reading -> stringResource(R.string.reading_progress)
     MainStatus.ReadComplete -> stringResource(R.string.read_complete)
     MainStatus.InvalidOutput -> stringResource(R.string.invalid_output)

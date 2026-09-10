@@ -21,7 +21,7 @@
     <string name="invalid_pairing_port">ペアリングポートが正しくありません</string>
     <string name="invalid_pairing_code">ペアリングコードは6桁の数字で入力してください</string>
     <string name="pairing_progress">ペアリング中…</string>
-    <string name="pairing_success">ペアリングしました</string>
+    <string name="pairing_success">ペアリングしました。続けて接続してください</string>
     <string name="pairing_failed">ペアリングに失敗しました</string>
     <string name="pair">ペアリング</string>
     <string name="expand_pairing_section">ペアリングセクションを開く</string>
@@ -30,7 +30,9 @@
     <string name="invalid_connection_port">接続ポートが正しくありません</string>
     <string name="connecting_progress">接続中…</string>
     <string name="connection_success">接続しました</string>
-    <string name="connection_failed">接続に失敗しました</string>
+    <string name="connection_failed">接続に失敗しました。接続ポートが正しい場合は、再ペアリングしてください</string>
+    <string name="connection_pairing_required">ペアリングが必要です。下の「初回・再設定時のペアリング」からペアリングしてください</string>
+    <string name="connection_port_unavailable">接続ポートに接続できません。ワイヤレスデバッグがONか、接続ポートが最新か確認してください</string>
     <string name="connect">接続</string>
     <string name="camera_settings">カメラ設定</string>
     <string name="camera_feature_available">現在値の確認と設定変更</string>
