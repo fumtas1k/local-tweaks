@@ -181,3 +181,15 @@ Phase 4の実機操作で、資格情報削除後も再起動前にPairを押せ
 ## Phase 5判定
 
 現行の対象端末とbuildについてMVPのDefinition of Doneを満たした。dependencyまたはpermissionを変更する場合は、strict lock、SHA-256 verification、merged manifest、release artifactの検査を再実行する。
+
+## OSアップデート後のペアリング消失（2026-09-10、ユーザー報告）
+
+ユーザー報告によると、SC-53GのOSアップデート後に次の事象があった。
+
+- 強制シャッター音設定がリセットされていた（ユーザー報告）。
+- Wireless Debuggingの「ペア設定済みのデバイス」一覧が空になっていた（スクリーンショットで確認）。
+- 端末側の接続用ポート表示と一致するポートをアプリへ入力しても、アプリは「接続に失敗しました」とだけ表示した。
+
+アップデート後のbuild番号、失敗時にアプリ内部を通った例外経路（`ConnectFailure`のどの分類に該当したか）、再ペアリングで復旧したかどうかは、いずれも未記録・未検証である。原因は「ペアリング情報が端末側から失われた状態でのconnect試行」と推測されるが、これは推測であり、本記録は事実として確認できた3点（上記の箇条書き）とユーザー報告の範囲に限定する。
+
+この事象を受け、接続失敗を`RestartRequired` / `PairingRequired` / `PortUnavailable` / `Other`に分類し、`PairingRequired`および汎用失敗の`Other`（`ConnectionFailed`）ではペアリングセクションを自動展開するようアプリを修正した（`docs/technical-design.md` 3.3、`docs/ui-design.md` の「状態表示」「接続設定」参照）。次回同様の事象が発生した場合は、build番号とアプリの表示状態（`MainStatus`）を記録し、この節を更新する。

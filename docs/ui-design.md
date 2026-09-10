@@ -62,15 +62,17 @@
 
 ## 状態表示
 
-`MainStatus`の26種を、表示の分類`MainStatusTone`にまとめる。文言の対応表（`statusText`）とは独立させ、色とアイコンはtoneだけから決める。
+`MainStatus`の28種を、表示の分類`MainStatusTone`にまとめる。文言の対応表（`statusText`）とは独立させ、色とアイコンはtoneだけから決める。
 
 | tone | `MainStatus` |
 | --- | --- |
 | `Neutral` | `NotConnected` |
 | `Progress` | `Pairing` / `Connecting` / `Reading` / `SettingZero` / `SettingOne` / `CredentialResetting` |
 | `Success` | `Paired` / `Connected` / `ReadComplete` / `SetZeroSuccess` / `SetOneSuccess` |
-| `Failure` | `InvalidPairingPort` / `InvalidPairingCode` / `PairingFailed` / `InvalidConnectionPort` / `ConnectionFailed` / `InvalidOutput` / `ReadTimeout` / `ReadTransportFailed` / `WriteReadBackMismatch` / `WriteInvalidOutput` / `WriteTimeout` / `WriteTransportFailed` / `CredentialResetFailed` |
+| `Failure` | `InvalidPairingPort` / `InvalidPairingCode` / `PairingFailed` / `InvalidConnectionPort` / `ConnectionFailed` / `ConnectionPairingRequired` / `ConnectionPortUnavailable` / `InvalidOutput` / `ReadTimeout` / `ReadTransportFailed` / `WriteReadBackMismatch` / `WriteInvalidOutput` / `WriteTimeout` / `WriteTransportFailed` / `CredentialResetFailed` |
 | `Warning` | `RestartRequired` |
+
+`ConnectionFailed`は接続失敗の汎用状態として残し、`ConnectionPairingRequired`（再ペアリングが必要）と`ConnectionPortUnavailable`（接続ポートに何も応答がない）を区別して追加した。この3状態は`adb/ConnectFailure.kt`の`classifyConnectFailure`が例外の型とcause chainだけから分類し、例外メッセージはUIにもログにも出さない。
 
 表示規則:
 
@@ -161,6 +163,9 @@ Top App BarとScaffoldのcontent paddingでsystem barを避ける。本文は16d
 - `restartRequired`のときは、画面最上部に`Warning`の状態表示を固定し、すべての入力とボタンを無効化する。
 - 「初回・再設定時のペアリング」セクションは見出し行自体をタップ領域にし、右端に開閉を示すシェブロン（`Icons.Filled.KeyboardArrowDown` / `Icons.Filled.KeyboardArrowUp`）を置く。畳んだ状態でも見出しとシェブロンだけは常に表示し、「ここを開けばペアリングできる」と分かる見た目にする。
 - 既定の開閉状態は`LocalAdbSession.hasStoredCredentials()`（`MainViewModel.hasStoredCredentialsAtStartup`）から決める。認証情報が無ければ既定で展開、既にあれば既定で折りたたむ。
+- 接続失敗は原因ごとに文言を分ける。`ConnectionPairingRequired`は再ペアリングが明確に必要な場合、`ConnectionPortUnavailable`は接続ポートに何も応答がない場合、`ConnectionFailed`はそれ以外の汎用失敗に使う（`docs/technical-design.md` 3.3〜3.4参照）。
+- `shouldExpandPairingSection(status)`が`true`を返す状態（`ConnectionPairingRequired`・`ConnectionFailed`）になったら、折りたたまれていてもペアリングセクションを自動で展開する。汎用失敗の`ConnectionFailed`まで含めるのは、libadbの一般的なTLS失敗が未ペアリングと区別できず、実機では未ペアリングに起因する場合があるため。自動展開はセクションを開く方向にだけ働き、ユーザーが開いた後や無関係な状態遷移で自動的に閉じることはない。
+- `ConnectionPortUnavailable`では自動展開しない。接続ポートに到達できないのはポート設定の問題であり、ペアリングセクションを開いても解決に寄与しないため。
 - `hasStoredCredentials()`は「ペアリング済み」を意味しない。認証情報は最初のペアリング/接続試行時に遅延生成されるため、失敗した試行の後でも`true`になり得る。この値は既定の開閉状態を決めるためだけに使い、ユーザーは畳んだ状態からもいつでも開けるようにする。到達性を折りたたみで奪わない。
 - 開閉状態はCompose側の`rememberSaveable`一時状態として保持し、画面回転で失われないようにする。永続化はしない。折りたたみ・展開の切り替えは、ペアリングコードを接続設定を離れたときにだけ破棄する既存の挙動に影響しない。
 
