@@ -124,8 +124,8 @@ internal fun MainUiState.applyConnectFailure(failure: ConnectFailure): MainUiSta
  * Whether the connection settings screen should auto-expand the pairing section for the given
  * status. [MainStatus.ConnectionFailed] is included because a generic TLS-level failure cannot
  * be distinguished from an unpaired device (see `classifyConnectFailure`), so this errs toward
- * showing the re-pairing path. [MainStatus.ConnectionPortUnavailable] is excluded because a
- * reachable-but-stale port is not a pairing problem, and forcing the section open there would
+ * showing the re-pairing path. [MainStatus.ConnectionPortUnavailable] is excluded because an
+ * unreachable (e.g. stale) port is not a pairing problem, and forcing the section open there would
  * misdirect the user toward re-pairing instead of correcting the port.
  */
 internal fun shouldExpandPairingSection(status: MainStatus): Boolean = when (status) {
